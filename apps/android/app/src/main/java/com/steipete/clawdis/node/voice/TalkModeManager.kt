@@ -183,6 +183,7 @@ class TalkModeManager(
   }
 
   private fun stop() {
+    Log.i(tag, "stop() called")
     stopRequested = true
     listeningMode = false
     restartJob?.cancel()
@@ -201,6 +202,7 @@ class TalkModeManager(
       recognizer?.cancel()
       recognizer?.destroy()
       recognizer = null
+      Log.v(tag, "stop: SpeechRecognizer destroyed")
     }
     systemTts?.stop()
     systemTtsPending?.cancel()
@@ -209,7 +211,11 @@ class TalkModeManager(
   }
 
   private fun startListeningInternal(markListening: Boolean) {
-    val r = recognizer ?: return
+    val r = recognizer ?: run {
+      Log.w(tag, "startListeningInternal: recognizer is null, aborting")
+      return
+    }
+    Log.v(tag, "startListeningInternal: markListening=$markListening")
     val intent =
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -223,23 +229,36 @@ class TalkModeManager(
       _isListening.value = true
     }
     r.startListening(intent)
+    Log.i(tag, "startListeningInternal: startListening() invoked")
   }
 
   private fun scheduleRestart(delayMs: Long = 350) {
-    if (stopRequested) return
+    if (stopRequested) {
+      Log.v(tag, "scheduleRestart: stopRequested=true, skipping")
+      return
+    }
+    Log.v(tag, "scheduleRestart: scheduling restart in ${delayMs}ms")
     restartJob?.cancel()
     restartJob =
       scope.launch {
         delay(delayMs)
         mainHandler.post {
-          if (stopRequested) return@post
+          if (stopRequested) {
+            Log.v(tag, "scheduleRestart: stopRequested after delay, skipping")
+            return@post
+          }
           try {
             recognizer?.cancel()
             val shouldListen = listeningMode
             val shouldInterrupt = _isSpeaking.value && interruptOnSpeech
-            if (!shouldListen && !shouldInterrupt) return@post
+            Log.v(tag, "scheduleRestart: shouldListen=$shouldListen shouldInterrupt=$shouldInterrupt")
+            if (!shouldListen && !shouldInterrupt) {
+              Log.v(tag, "scheduleRestart: no need to restart, skipping")
+              return@post
+            }
             startListeningInternal(markListening = shouldListen)
-          } catch (_: Throwable) {
+          } catch (err: Throwable) {
+            Log.w(tag, "scheduleRestart: restart failed", err)
             // handled by onError
           }
         }
@@ -248,26 +267,37 @@ class TalkModeManager(
 
   private fun handleTranscript(text: String, isFinal: Boolean) {
     val trimmed = text.trim()
+    Log.v(tag, "handleTranscript: isFinal=$isFinal text='$trimmed'")
+
     if (_isSpeaking.value && interruptOnSpeech) {
       if (shouldInterrupt(trimmed)) {
+        Log.i(tag, "handleTranscript: user interrupted speech with '$trimmed'")
         stopSpeaking()
+      } else {
+        Log.v(tag, "handleTranscript: speech active but not interrupting")
       }
       return
     }
 
-    if (!_isListening.value) return
+    if (!_isListening.value) {
+      Log.v(tag, "handleTranscript: not in listening mode, ignoring")
+      return
+    }
 
     if (trimmed.isNotEmpty()) {
       lastTranscript = trimmed
       lastHeardAtMs = SystemClock.elapsedRealtime()
+      Log.v(tag, "handleTranscript: updated lastTranscript='$trimmed'")
     }
 
     if (isFinal) {
       lastTranscript = trimmed
+      Log.i(tag, "handleTranscript: final transcript='$trimmed'")
     }
   }
 
   private fun startSilenceMonitor() {
+    Log.v(tag, "startSilenceMonitor: starting silence detection loop")
     silenceJob?.cancel()
     silenceJob =
       scope.launch {
@@ -285,10 +315,12 @@ class TalkModeManager(
     val lastHeard = lastHeardAtMs ?: return
     val elapsed = SystemClock.elapsedRealtime() - lastHeard
     if (elapsed < silenceWindowMs) return
+    Log.i(tag, "checkSilence: silence detected after ${elapsed}ms, finalizing transcript")
     scope.launch { finalizeTranscript(transcript) }
   }
 
   private suspend fun finalizeTranscript(transcript: String) {
+    Log.i(tag, "finalizeTranscript: processing transcript='$transcript'")
     listeningMode = false
     _isListening.value = false
     _statusText.value = "Thinking…"
@@ -297,10 +329,11 @@ class TalkModeManager(
 
     reloadConfig()
     val prompt = buildPrompt(transcript)
+    Log.v(tag, "finalizeTranscript: built prompt, length=${prompt.length}")
     val bridge = session
     if (bridge == null) {
       _statusText.value = "Bridge not connected"
-      Log.w(tag, "finalize: bridge not connected")
+      Log.w(tag, "finalizeTranscript: bridge not connected")
       start()
       return
     }
@@ -1175,26 +1208,52 @@ class TalkModeManager(
   private val listener =
     object : RecognitionListener {
       override fun onReadyForSpeech(params: Bundle?) {
+        Log.i(tag, "RecognitionListener: onReadyForSpeech")
         if (_isEnabled.value) {
           _statusText.value = if (_isListening.value) "Listening" else _statusText.value
         }
       }
 
-      override fun onBeginningOfSpeech() {}
+      override fun onBeginningOfSpeech() {
+        Log.v(tag, "RecognitionListener: onBeginningOfSpeech - user started speaking")
+      }
 
-      override fun onRmsChanged(rmsdB: Float) {}
+      override fun onRmsChanged(rmsdB: Float) {
+        // Log.v(tag, "RecognitionListener: onRmsChanged rmsdB=$rmsdB") // Too verbose
+      }
 
-      override fun onBufferReceived(buffer: ByteArray?) {}
+      override fun onBufferReceived(buffer: ByteArray?) {
+        Log.v(tag, "RecognitionListener: onBufferReceived size=${buffer?.size ?: 0}")
+      }
 
       override fun onEndOfSpeech() {
+        Log.i(tag, "RecognitionListener: onEndOfSpeech - user stopped speaking")
         scheduleRestart()
       }
 
       override fun onError(error: Int) {
-        if (stopRequested) return
+        val errorName = when (error) {
+          SpeechRecognizer.ERROR_AUDIO -> "ERROR_AUDIO"
+          SpeechRecognizer.ERROR_CLIENT -> "ERROR_CLIENT"
+          SpeechRecognizer.ERROR_NETWORK -> "ERROR_NETWORK"
+          SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
+          SpeechRecognizer.ERROR_NO_MATCH -> "ERROR_NO_MATCH"
+          SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "ERROR_RECOGNIZER_BUSY"
+          SpeechRecognizer.ERROR_SERVER -> "ERROR_SERVER"
+          SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "ERROR_SPEECH_TIMEOUT"
+          SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "ERROR_INSUFFICIENT_PERMISSIONS"
+          else -> "UNKNOWN($error)"
+        }
+        Log.w(tag, "RecognitionListener: onError code=$error ($errorName)")
+
+        if (stopRequested) {
+          Log.v(tag, "RecognitionListener: onError ignored (stopRequested=true)")
+          return
+        }
         _isListening.value = false
         if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
           _statusText.value = "Microphone permission required"
+          Log.e(tag, "RecognitionListener: microphone permission missing!")
           return
         }
 
@@ -1215,16 +1274,20 @@ class TalkModeManager(
 
       override fun onResults(results: Bundle?) {
         val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+        Log.i(tag, "RecognitionListener: onResults count=${list.size} first='${list.firstOrNull()}'")
         list.firstOrNull()?.let { handleTranscript(it, isFinal = true) }
         scheduleRestart()
       }
 
       override fun onPartialResults(partialResults: Bundle?) {
         val list = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+        Log.v(tag, "RecognitionListener: onPartialResults count=${list.size} first='${list.firstOrNull()}'")
         list.firstOrNull()?.let { handleTranscript(it, isFinal = false) }
       }
 
-      override fun onEvent(eventType: Int, params: Bundle?) {}
+      override fun onEvent(eventType: Int, params: Bundle?) {
+        Log.v(tag, "RecognitionListener: onEvent type=$eventType")
+      }
     }
 }
 
