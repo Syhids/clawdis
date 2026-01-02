@@ -1,26 +1,54 @@
 package com.steipete.clawdis.node.voice
 
+import android.util.Log
+
 object VoiceWakeCommandExtractor {
+  private const val TAG = "VoiceWakeExtractor"
+
   fun extractCommand(text: String, triggerWords: List<String>): String? {
     val raw = text.trim()
-    if (raw.isEmpty()) return null
+    if (raw.isEmpty()) {
+      Log.v(TAG, "extractCommand: empty input")
+      return null
+    }
 
     val triggers =
       triggerWords
         .map { it.trim().lowercase() }
         .filter { it.isNotEmpty() }
         .distinct()
-    if (triggers.isEmpty()) return null
+    if (triggers.isEmpty()) {
+      Log.v(TAG, "extractCommand: no trigger words configured")
+      return null
+    }
+
+    Log.v(TAG, "extractCommand: checking '$raw' against triggers: ${triggers.joinToString()}")
 
     val alternation = triggers.joinToString("|") { Regex.escape(it) }
     // Match: "<anything> <trigger><punct/space> <command>"
     val regex = Regex("(?i)(?:^|\\s)($alternation)\\b[\\s\\p{Punct}]*([\\s\\S]+)$")
-    val match = regex.find(raw) ?: return null
+    val match = regex.find(raw)
+    if (match == null) {
+      Log.v(TAG, "extractCommand: no trigger word match found")
+      return null
+    }
+
+    val matchedTrigger = match.groupValues.getOrNull(1) ?: ""
     val extracted = match.groupValues.getOrNull(2)?.trim().orEmpty()
-    if (extracted.isEmpty()) return null
+    Log.v(TAG, "extractCommand: matched trigger='$matchedTrigger' extracted='$extracted'")
+
+    if (extracted.isEmpty()) {
+      Log.v(TAG, "extractCommand: extracted command is empty")
+      return null
+    }
 
     val cleaned = extracted.trimStart { it.isWhitespace() || it.isPunctuation() }.trim()
-    if (cleaned.isEmpty()) return null
+    if (cleaned.isEmpty()) {
+      Log.v(TAG, "extractCommand: cleaned command is empty")
+      return null
+    }
+
+    Log.i(TAG, "extractCommand: trigger='$matchedTrigger' command='$cleaned'")
     return cleaned
   }
 }
