@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.clawdbot.android.chat.ChatController
 import com.clawdbot.android.chat.ChatMessage
@@ -280,6 +281,7 @@ class NodeRuntime(context: Context) {
           val port = manualPort.value
           if (host.isNotEmpty() && port in 1..65535) {
             didAutoConnect = true
+            Log.d("Bridge", "Connecting(auto) manually to $host:$port")
             connect(BridgeEndpoint.manual(host = host, port = port))
           }
           return@collect
@@ -289,6 +291,7 @@ class NodeRuntime(context: Context) {
         if (targetStableId.isEmpty()) return@collect
         val target = list.firstOrNull { it.stableId == targetStableId } ?: return@collect
         didAutoConnect = true
+        Log.d("Bridge", "Connecting(auto) to discovered target width id $targetStableId(${target.host}:${target.port})")
         connect(target)
       }
     }
@@ -524,6 +527,7 @@ class NodeRuntime(context: Context) {
   fun connectManual() {
     val host = manualHost.value.trim()
     val port = manualPort.value
+    Log.d("Bridge", "Connecting manually to $host:$port")
     if (host.isEmpty() || port <= 0 || port > 65535) {
       _statusText.value = "Failed: invalid manual host/port"
       return
