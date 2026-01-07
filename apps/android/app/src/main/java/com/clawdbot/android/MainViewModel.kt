@@ -1,6 +1,7 @@
 package com.clawdbot.android
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import com.clawdbot.android.bridge.BridgeEndpoint
 import com.clawdbot.android.chat.OutgoingAttachment
@@ -123,6 +124,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   }
 
   fun connect(endpoint: BridgeEndpoint) {
+    Log.d("Bridge", "Calling connect to $endpoint.host:$endpoint.port")
     runtime.connect(endpoint)
   }
 
