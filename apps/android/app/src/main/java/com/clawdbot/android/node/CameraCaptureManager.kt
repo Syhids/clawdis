@@ -12,6 +12,7 @@ import android.util.Base64
 import android.content.pm.PackageManager
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.LifecycleOwner
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -110,14 +111,12 @@ class CameraCaptureManager(private val context: Context) {
     withContext(Dispatchers.Main) {
       ensureCameraPermission()
       val owner = lifecycleOwner ?: throw IllegalStateException("UNAVAILABLE: camera not ready")
-      val facing = parseFacing(paramsJson) ?: "front"
       val quality = (parseQuality(paramsJson) ?: 0.9).coerceIn(0.1, 1.0)
       val maxWidth = parseMaxWidth(paramsJson)
 
       val provider = context.cameraProvider()
       val capture = ImageCapture.Builder().build()
-      val selector =
-        if (facing == "front") CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+      val selector = buildCameraSelector(paramsJson)
 
       provider.unbindAll()
       provider.bindToLifecycle(owner, selector, capture)
@@ -175,7 +174,6 @@ class CameraCaptureManager(private val context: Context) {
     withContext(Dispatchers.Main) {
       ensureCameraPermission()
       val owner = lifecycleOwner ?: throw IllegalStateException("UNAVAILABLE: camera not ready")
-      val facing = parseFacing(paramsJson) ?: "front"
       val durationMs = (parseDurationMs(paramsJson) ?: 3_000).coerceIn(200, 60_000)
       val includeAudio = parseIncludeAudio(paramsJson) ?: true
       if (includeAudio) ensureMicPermission()
@@ -183,8 +181,7 @@ class CameraCaptureManager(private val context: Context) {
       val provider = context.cameraProvider()
       val recorder = Recorder.Builder().build()
       val videoCapture = VideoCapture.withOutput(recorder)
-      val selector =
-        if (facing == "front") CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+      val selector = buildCameraSelector(paramsJson)
 
       provider.unbindAll()
       provider.bindToLifecycle(owner, selector, videoCapture)
@@ -262,6 +259,39 @@ class CameraCaptureManager(private val context: Context) {
       paramsJson?.contains("\"back\"") == true -> "back"
       else -> null
     }
+
+  private fun parseDeviceId(paramsJson: String?): String? {
+    val raw = paramsJson ?: return null
+    val key = "\"deviceId\""
+    val idx = raw.indexOf(key)
+    if (idx < 0) return null
+    val colon = raw.indexOf(':', idx + key.length)
+    if (colon < 0) return null
+    val tail = raw.substring(colon + 1).trimStart()
+    if (!tail.startsWith('"')) return null
+    val end = tail.indexOf('"', 1)
+    if (end < 0) return null
+    return tail.substring(1, end).takeIf { it.isNotEmpty() }
+  }
+
+  @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+  private fun buildCameraSelector(paramsJson: String?): CameraSelector {
+    val deviceId = parseDeviceId(paramsJson)
+    if (deviceId != null) {
+      // Filter by specific camera ID
+      return CameraSelector.Builder()
+        .addCameraFilter { cameras ->
+          cameras.filter { cameraInfo ->
+            val id = Camera2CameraInfo.from(cameraInfo).cameraId
+            id == deviceId
+          }
+        }
+        .build()
+    }
+    // Fallback to front/back based on facing parameter
+    val facing = parseFacing(paramsJson) ?: "front"
+    return if (facing == "front") CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+  }
 
   private fun parseQuality(paramsJson: String?): Double? =
     parseNumber(paramsJson, key = "quality")?.toDoubleOrNull()
