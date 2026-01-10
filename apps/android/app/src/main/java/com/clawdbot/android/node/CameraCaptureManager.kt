@@ -44,6 +44,11 @@ class CameraCaptureManager(private val context: Context) {
     val name: String,
     val position: String,
     val hasFlash: Boolean,
+    val megapixels: Double?,
+    val focalLengths: List<Float>,
+    val minFocusDistance: Float?,
+    val capabilities: List<String>,
+    val lensType: String?,
   )
 
   @Volatile private var lifecycleOwner: LifecycleOwner? = null
@@ -70,15 +75,74 @@ class CameraCaptureManager(private val context: Context) {
           else -> "unknown"
         }
         val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+
+        // Megapixels from sensor size
+        val pixelArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+        val megapixels = pixelArray?.let {
+          (it.width.toLong() * it.height.toLong()) / 1_000_000.0
+        }?.let { Math.round(it * 10) / 10.0 }
+
+        // Focal lengths
+        val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+          ?.toList() ?: emptyList()
+
+        // Minimum focus distance (diopters; higher = can focus closer = macro)
+        val minFocusDistance = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+
+        // Capabilities
+        val caps = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
+        val capabilities = caps.mapNotNull { cap ->
+          when (cap) {
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW -> "raw"
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR -> "manualSensor"
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT -> "depth"
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA -> "logicalMultiCamera"
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR -> "ultraHighRes"
+            else -> null
+          }
+        }
+
+        // Infer lens type from focal length and capabilities
+        val lensType = inferLensType(focalLengths, minFocusDistance, capabilities)
+
+        val typeLabel = lensType?.let { " $it" } ?: ""
         CameraDeviceInfo(
           id = id,
-          name = "Camera $id ($position)",
+          name = "Camera $id ($position$typeLabel)",
           position = position,
           hasFlash = hasFlash,
+          megapixels = megapixels,
+          focalLengths = focalLengths,
+          minFocusDistance = minFocusDistance,
+          capabilities = capabilities,
+          lensType = lensType,
         )
       } catch (_: Throwable) {
         null
       }
+    }
+  }
+
+  private fun inferLensType(
+    focalLengths: List<Float>,
+    minFocusDistance: Float?,
+    capabilities: List<String>,
+  ): String? {
+    // Depth sensor
+    if (capabilities.contains("depth")) return "depth"
+
+    val primaryFocal = focalLengths.firstOrNull() ?: return null
+
+    // Macro: can focus very close (high diopter value, typically > 10)
+    if (minFocusDistance != null && minFocusDistance > 10f) return "macro"
+
+    // Based on 35mm equivalent approximation for phone sensors
+    // Phone sensors are tiny, so actual focal lengths are small
+    return when {
+      primaryFocal < 2.0f -> "ultrawide"
+      primaryFocal < 3.5f -> "wide"
+      primaryFocal < 6.0f -> "standard"
+      else -> "telephoto"
     }
   }
 

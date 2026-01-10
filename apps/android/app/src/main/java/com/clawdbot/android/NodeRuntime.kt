@@ -829,7 +829,12 @@ class NodeRuntime(context: Context) {
       ClawdbotCameraCommand.List.rawValue -> {
         val devices = camera.listDevices()
         val devicesJson = devices.joinToString(",") { d ->
-          """{"id":"${d.id}","name":"${d.name}","position":"${d.position}","hasFlash":${d.hasFlash}}"""
+          val focalJson = d.focalLengths.joinToString(",") { f -> f.toString() }
+          val capsJson = d.capabilities.joinToString(",") { c -> "\"$c\"" }
+          val megapixelsJson = d.megapixels?.toString() ?: "null"
+          val minFocusJson = d.minFocusDistance?.toString() ?: "null"
+          val lensTypeJson = d.lensType?.let { "\"$it\"" } ?: "null"
+          """{"id":"${d.id}","name":"${d.name}","position":"${d.position}","hasFlash":${d.hasFlash},"megapixels":$megapixelsJson,"focalLengths":[$focalJson],"minFocusDistance":$minFocusJson,"capabilities":[$capsJson],"lensType":$lensTypeJson}"""
         }
         BridgeSession.InvokeResult.ok("""{"devices":[$devicesJson]}""")
       }
