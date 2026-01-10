@@ -379,6 +379,7 @@ class NodeRuntime(context: Context) {
       add(ClawdbotCanvasA2UICommand.Reset.rawValue)
       add(ClawdbotScreenCommand.Record.rawValue)
       if (cameraEnabled.value) {
+        add(ClawdbotCameraCommand.List.rawValue)
         add(ClawdbotCameraCommand.Snap.rawValue)
         add(ClawdbotCameraCommand.Clip.rawValue)
       }
@@ -711,18 +712,18 @@ class NodeRuntime(context: Context) {
   }
 
   private suspend fun handleInvoke(command: String, paramsJson: String?): BridgeSession.InvokeResult {
-    if (
+    // camera.list only queries device metadata; allow in background.
+    val requiresForeground =
       command.startsWith(ClawdbotCanvasCommand.NamespacePrefix) ||
         command.startsWith(ClawdbotCanvasA2UICommand.NamespacePrefix) ||
-        command.startsWith(ClawdbotCameraCommand.NamespacePrefix) ||
-        command.startsWith(ClawdbotScreenCommand.NamespacePrefix)
-      ) {
-      if (!isForeground.value) {
-        return BridgeSession.InvokeResult.error(
-          code = "NODE_BACKGROUND_UNAVAILABLE",
-          message = "NODE_BACKGROUND_UNAVAILABLE: canvas/camera/screen commands require foreground",
-        )
-      }
+        command.startsWith(ClawdbotScreenCommand.NamespacePrefix) ||
+        (command.startsWith(ClawdbotCameraCommand.NamespacePrefix) &&
+          command != ClawdbotCameraCommand.List.rawValue)
+    if (requiresForeground && !isForeground.value) {
+      return BridgeSession.InvokeResult.error(
+        code = "NODE_BACKGROUND_UNAVAILABLE",
+        message = "NODE_BACKGROUND_UNAVAILABLE: canvas/camera/screen commands require foreground",
+      )
     }
     if (command.startsWith(ClawdbotCameraCommand.NamespacePrefix) && !cameraEnabled.value) {
       return BridgeSession.InvokeResult.error(
@@ -824,6 +825,13 @@ class NodeRuntime(context: Context) {
         val js = a2uiApplyMessagesJS(messages)
         val res = canvas.eval(js)
         BridgeSession.InvokeResult.ok(res)
+      }
+      ClawdbotCameraCommand.List.rawValue -> {
+        val devices = camera.listDevices()
+        val devicesJson = devices.joinToString(",") { d ->
+          """{"id":"${d.id}","name":"${d.name}","position":"${d.position}","hasFlash":${d.hasFlash}}"""
+        }
+        BridgeSession.InvokeResult.ok("""{"devices":[$devicesJson]}""")
       }
       ClawdbotCameraCommand.Snap.rawValue -> {
         showCameraHud(message = "Taking photo…", kind = CameraHudKind.Photo)

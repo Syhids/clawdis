@@ -3,6 +3,8 @@ package com.clawdbot.android.node
 import android.Manifest
 import android.content.Context
 import android.annotation.SuppressLint
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -37,6 +39,13 @@ import kotlin.coroutines.resumeWithException
 class CameraCaptureManager(private val context: Context) {
   data class Payload(val payloadJson: String)
 
+  data class CameraDeviceInfo(
+    val id: String,
+    val name: String,
+    val position: String,
+    val hasFlash: Boolean,
+  )
+
   @Volatile private var lifecycleOwner: LifecycleOwner? = null
   @Volatile private var permissionRequester: PermissionRequester? = null
 
@@ -46,6 +55,31 @@ class CameraCaptureManager(private val context: Context) {
 
   fun attachPermissionRequester(requester: PermissionRequester) {
     permissionRequester = requester
+  }
+
+  fun listDevices(): List<CameraDeviceInfo> {
+    val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    return cameraManager.cameraIdList.mapNotNull { id ->
+      try {
+        val characteristics = cameraManager.getCameraCharacteristics(id)
+        val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+        val position = when (facing) {
+          CameraCharacteristics.LENS_FACING_FRONT -> "front"
+          CameraCharacteristics.LENS_FACING_BACK -> "back"
+          CameraCharacteristics.LENS_FACING_EXTERNAL -> "external"
+          else -> "unknown"
+        }
+        val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+        CameraDeviceInfo(
+          id = id,
+          name = "Camera $id ($position)",
+          position = position,
+          hasFlash = hasFlash,
+        )
+      } catch (_: Throwable) {
+        null
+      }
+    }
   }
 
   private suspend fun ensureCameraPermission() {

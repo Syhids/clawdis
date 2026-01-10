@@ -34,6 +34,7 @@ enum class ClawdbotCanvasA2UICommand(val rawValue: String) {
 }
 
 enum class ClawdbotCameraCommand(val rawValue: String) {
+  List("camera.list"),
   Snap("camera.snap"),
   Clip("camera.clip"),
   ;
