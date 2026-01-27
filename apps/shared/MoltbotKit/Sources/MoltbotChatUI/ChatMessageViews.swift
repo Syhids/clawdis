@@ -141,18 +141,47 @@ struct ChatMessageBubble: View {
     let userAccent: Color?
 
     var body: some View {
-        ChatMessageBody(
-            message: self.message,
-            isUser: self.isUser,
-            style: self.style,
-            markdownVariant: self.markdownVariant,
-            userAccent: self.userAccent)
-            .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
-            .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
-            .padding(.horizontal, 2)
+        VStack(alignment: self.isUser ? .trailing : .leading, spacing: 2) {
+            ChatMessageBody(
+                message: self.message,
+                isUser: self.isUser,
+                style: self.style,
+                markdownVariant: self.markdownVariant,
+                userAccent: self.userAccent)
+                .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
+            if let timestampText = self.formattedTimestamp {
+                Text(timestampText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary.opacity(0.6))
+                    .padding(.horizontal, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
+        .padding(.horizontal, 2)
     }
 
     private var isUser: Bool { self.message.role.lowercased() == "user" }
+
+    private var formattedTimestamp: String? {
+        guard let ts = self.message.timestamp, ts > 0 else { return nil }
+        let date = Date(timeIntervalSince1970: ts / 1000.0)
+        let now = Date()
+        let calendar = Calendar.current
+        let dayDiff = calendar.dateComponents([.day], from: date, to: now).day ?? 0
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+
+        if calendar.isDateInToday(date) {
+            formatter.dateFormat = "HH:mm"
+        } else if dayDiff < 7 {
+            formatter.dateFormat = "EEE HH:mm"
+        } else {
+            formatter.dateFormat = "d MMM HH:mm"
+        }
+
+        return formatter.string(from: date)
+    }
 }
 
 @MainActor

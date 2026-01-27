@@ -38,31 +38,48 @@ import bot.molt.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
   val isUser = message.role.lowercase() == "user"
+  val timestampText = remember(message.timestampMs) { formatTimestamp(message.timestampMs) }
 
-  Row(
+  Column(
     modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+    horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
   ) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      color = Color.Transparent,
-      modifier = Modifier.fillMaxWidth(0.92f),
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
-      Box(
-        modifier =
-          Modifier
-            .background(bubbleBackground(isUser))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+      Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(0.92f),
       ) {
-        val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
+        Box(
+          modifier =
+            Modifier
+              .background(bubbleBackground(isUser))
+              .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+          val textColor = textColorOverBubble(isUser)
+          ChatMessageBody(content = message.content, textColor = textColor)
+        }
       }
+    }
+    if (timestampText != null) {
+      Text(
+        text = timestampText,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+      )
     }
   }
 }
@@ -249,4 +266,36 @@ fun ChatCodeBlock(code: String, language: String?) {
       color = MaterialTheme.colorScheme.onSurface,
     )
   }
+}
+
+private fun formatTimestamp(timestampMs: Long?): String? {
+  if (timestampMs == null || timestampMs <= 0) return null
+  val now = System.currentTimeMillis()
+  val diff = now - timestampMs
+  val date = Date(timestampMs)
+
+  // If today, show only time (e.g., "14:32")
+  // If yesterday or within 7 days, show day + time (e.g., "Mon 14:32")
+  // Otherwise, show date + time (e.g., "15 Jan 14:32")
+  val dayMs = 24 * 60 * 60 * 1000L
+  val weekMs = 7 * dayMs
+
+  return when {
+    diff < dayMs && isSameDay(timestampMs, now) -> {
+      SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+    }
+    diff < weekMs -> {
+      SimpleDateFormat("EEE HH:mm", Locale.getDefault()).format(date)
+    }
+    else -> {
+      SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(date)
+    }
+  }
+}
+
+private fun isSameDay(ts1: Long, ts2: Long): Boolean {
+  val cal1 = java.util.Calendar.getInstance().apply { timeInMillis = ts1 }
+  val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = ts2 }
+  return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
+    cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
 }
