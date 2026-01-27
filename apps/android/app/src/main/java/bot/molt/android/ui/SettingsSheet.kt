@@ -1,15 +1,20 @@
 package bot.molt.android.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,6 +69,8 @@ import bot.molt.android.MainViewModel
 import bot.molt.android.NodeForegroundService
 import bot.molt.android.VoiceWakeMode
 import bot.molt.android.WakeWords
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 @Composable
 fun SettingsSheet(viewModel: MainViewModel) {
@@ -110,6 +117,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
         versionName
       }
     }
+  val localIpAddress = remember { getLocalIpAddress() }
 
   LaunchedEffect(wakeWords) { setWakeWordsText(wakeWords.joinToString(", ")) }
   val commitWakeWords = {
@@ -278,6 +286,13 @@ fun SettingsSheet(viewModel: MainViewModel) {
     }
     item { Text("Instance ID: $instanceId", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     item { Text("Device: $deviceModel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    item {
+      CopyableInfoRow(
+        label = "IP",
+        value = localIpAddress ?: "—",
+        context = context,
+      )
+    }
     item { Text("Version: $appVersion", color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
     item { HorizontalDivider() }
@@ -683,4 +698,66 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+/**
+ * Returns the primary local IPv4 address, preferring wlan0 (Wi-Fi) over other interfaces.
+ * Returns null if no suitable address is found.
+ */
+private fun getLocalIpAddress(): String? {
+  return try {
+    var fallback: String? = null
+    var wlan: String? = null
+
+    for (intf in NetworkInterface.getNetworkInterfaces()) {
+      if (!intf.isUp || intf.isLoopback) continue
+
+      for (addr in intf.inetAddresses) {
+        if (addr.isLoopbackAddress || addr !is Inet4Address) continue
+
+        val ip = addr.hostAddress ?: continue
+        if (intf.name.startsWith("wlan", ignoreCase = true)) {
+          wlan = ip
+          break
+        }
+        if (fallback == null) {
+          fallback = ip
+        }
+      }
+
+      if (wlan != null) break
+    }
+
+    wlan ?: fallback
+  } catch (_: Throwable) {
+    null
+  }
+}
+
+private fun copyToClipboard(context: Context, label: String, text: String) {
+  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+  clipboard?.setPrimaryClip(ClipData.newPlainText(label, text))
+  Toast.makeText(context, "Copied $label", Toast.LENGTH_SHORT).show()
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CopyableInfoRow(label: String, value: String, context: Context) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .combinedClickable(
+        onClick = {},
+        onLongClick = {
+          if (value != "—") {
+            copyToClipboard(context, label, value)
+          }
+        },
+      ),
+  ) {
+    Text(
+      text = "$label: $value",
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
 }
