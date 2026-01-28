@@ -11,24 +11,35 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowCircleDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import bot.molt.android.chat.ChatMessage
 import bot.molt.android.chat.ChatPendingToolCall
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatMessageListCard(
   messages: List<ChatMessage>,
   pendingRunCount: Int,
   pendingToolCalls: List<ChatPendingToolCall>,
   streamingAssistantText: String?,
+  onRefresh: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
   val listState = rememberLazyListState()
@@ -43,6 +54,9 @@ fun ChatMessageListCard(
     listState.animateScrollToItem(index = total - 1)
   }
 
+  val scope = rememberCoroutineScope()
+  var isRefreshing by remember { mutableStateOf(false) }
+
   Card(
     modifier = modifier.fillMaxWidth(),
     shape = MaterialTheme.shapes.large,
@@ -52,39 +66,55 @@ fun ChatMessageListCard(
       ),
     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
   ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-      LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp, start = 12.dp, end = 12.dp),
-      ) {
-        items(count = messages.size, key = { idx -> messages[idx].id }) { idx ->
-          ChatMessageBubble(message = messages[idx])
+    PullToRefreshBox(
+      isRefreshing = isRefreshing,
+      onRefresh = {
+        if (onRefresh != null) {
+          scope.launch {
+            isRefreshing = true
+            onRefresh()
+            // Brief delay to show the refresh indicator
+            delay(300)
+            isRefreshing = false
+          }
         }
+      },
+      modifier = Modifier.fillMaxSize(),
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+          modifier = Modifier.fillMaxSize(),
+          state = listState,
+          verticalArrangement = Arrangement.spacedBy(14.dp),
+          contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp, start = 12.dp, end = 12.dp),
+        ) {
+          items(count = messages.size, key = { idx -> messages[idx].id }) { idx ->
+            ChatMessageBubble(message = messages[idx])
+          }
 
-        if (pendingRunCount > 0) {
-          item(key = "typing") {
-            ChatTypingIndicatorBubble()
+          if (pendingRunCount > 0) {
+            item(key = "typing") {
+              ChatTypingIndicatorBubble()
+            }
+          }
+
+          if (pendingToolCalls.isNotEmpty()) {
+            item(key = "tools") {
+              ChatPendingToolsBubble(toolCalls = pendingToolCalls)
+            }
+          }
+
+          val stream = streamingAssistantText?.trim()
+          if (!stream.isNullOrEmpty()) {
+            item(key = "stream") {
+              ChatStreamingAssistantBubble(text = stream)
+            }
           }
         }
 
-        if (pendingToolCalls.isNotEmpty()) {
-          item(key = "tools") {
-            ChatPendingToolsBubble(toolCalls = pendingToolCalls)
-          }
+        if (messages.isEmpty() && pendingRunCount == 0 && pendingToolCalls.isEmpty() && streamingAssistantText.isNullOrBlank()) {
+          EmptyChatHint(modifier = Modifier.align(Alignment.Center))
         }
-
-        val stream = streamingAssistantText?.trim()
-        if (!stream.isNullOrEmpty()) {
-          item(key = "stream") {
-            ChatStreamingAssistantBubble(text = stream)
-          }
-        }
-      }
-
-      if (messages.isEmpty() && pendingRunCount == 0 && pendingToolCalls.isEmpty() && streamingAssistantText.isNullOrBlank()) {
-        EmptyChatHint(modifier = Modifier.align(Alignment.Center))
       }
     }
   }
