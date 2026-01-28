@@ -1,17 +1,28 @@
 package bot.molt.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -236,17 +247,58 @@ private fun PulseDot(alpha: Float) {
 
 @Composable
 fun ChatCodeBlock(code: String, language: String?) {
+  val context = LocalContext.current
+  val trimmedCode = code.trimEnd()
+
   Surface(
     shape = RoundedCornerShape(12.dp),
     color = MaterialTheme.colorScheme.surfaceContainerLowest,
     modifier = Modifier.fillMaxWidth(),
   ) {
-    Text(
-      text = code.trimEnd(),
-      modifier = Modifier.padding(10.dp),
-      fontFamily = FontFamily.Monospace,
-      style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
+    Column {
+      // Header with language label and copy button
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(MaterialTheme.colorScheme.surfaceContainerLow)
+          .padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          text = language?.ifEmpty { null } ?: "code",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          fontFamily = FontFamily.Monospace,
+        )
+        IconButton(
+          onClick = { copyCodeToClipboard(context, trimmedCode) },
+          modifier = Modifier.size(28.dp),
+          colors = IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          ),
+        ) {
+          Icon(
+            imageVector = Icons.Outlined.ContentCopy,
+            contentDescription = "Copy code",
+            modifier = Modifier.size(16.dp),
+          )
+        }
+      }
+      // Code content
+      Text(
+        text = trimmedCode,
+        modifier = Modifier.padding(10.dp),
+        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+      )
+    }
   }
+}
+
+private fun copyCodeToClipboard(context: Context, code: String) {
+  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+  clipboard?.setPrimaryClip(ClipData.newPlainText("code", code))
+  Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
 }
