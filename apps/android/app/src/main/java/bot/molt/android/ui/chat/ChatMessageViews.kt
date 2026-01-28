@@ -1,8 +1,15 @@
 package bot.molt.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +19,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,10 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
@@ -39,32 +55,100 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
   val isUser = message.role.lowercase() == "user"
+  val context = LocalContext.current
+  val haptic = LocalHapticFeedback.current
+  var showMenu by remember { mutableStateOf(false) }
+
+  val plainText = remember(message.content) { extractPlainText(message.content) }
 
   Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
   ) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      color = Color.Transparent,
-      modifier = Modifier.fillMaxWidth(0.92f),
-    ) {
-      Box(
-        modifier =
-          Modifier
-            .background(bubbleBackground(isUser))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+    Box {
+      Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        color = Color.Transparent,
+        modifier = Modifier
+          .fillMaxWidth(0.92f)
+          .clip(RoundedCornerShape(16.dp))
+          .combinedClickable(
+            onClick = { },
+            onLongClick = {
+              if (plainText.isNotBlank()) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showMenu = true
+              }
+            },
+          ),
       ) {
-        val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
+        Box(
+          modifier =
+            Modifier
+              .background(bubbleBackground(isUser))
+              .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+          val textColor = textColorOverBubble(isUser)
+          ChatMessageBody(content = message.content, textColor = textColor)
+        }
+      }
+
+      DropdownMenu(
+        expanded = showMenu,
+        onDismissRequest = { showMenu = false },
+      ) {
+        DropdownMenuItem(
+          text = { Text("Copy") },
+          onClick = {
+            copyToClipboard(context, plainText)
+            showMenu = false
+          },
+          leadingIcon = {
+            Icon(Icons.Default.ContentCopy, contentDescription = null)
+          },
+        )
+        DropdownMenuItem(
+          text = { Text("Share") },
+          onClick = {
+            shareText(context, plainText)
+            showMenu = false
+          },
+          leadingIcon = {
+            Icon(Icons.Default.Share, contentDescription = null)
+          },
+        )
       }
     }
   }
+}
+
+private fun extractPlainText(content: List<ChatMessageContent>): String {
+  return content
+    .filter { it.type == "text" }
+    .mapNotNull { it.text }
+    .joinToString("\n\n")
+    .trim()
+}
+
+private fun copyToClipboard(context: Context, text: String) {
+  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+  val clip = ClipData.newPlainText("Message", text)
+  clipboard.setPrimaryClip(clip)
+  Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+}
+
+private fun shareText(context: Context, text: String) {
+  val intent = Intent(Intent.ACTION_SEND).apply {
+    type = "text/plain"
+    putExtra(Intent.EXTRA_TEXT, text)
+  }
+  context.startActivity(Intent.createChooser(intent, "Share message"))
 }
 
 @Composable
