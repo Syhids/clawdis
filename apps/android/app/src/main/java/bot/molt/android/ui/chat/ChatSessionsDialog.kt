@@ -17,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import bot.molt.android.chat.ChatSessionEntry
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun ChatSessionsDialog(
@@ -66,6 +71,10 @@ private fun SessionRow(
   isCurrent: Boolean,
   onClick: () -> Unit,
 ) {
+  val timestampText = remember(entry.updatedAtMs) {
+    formatRelativeTimestamp(entry.updatedAtMs)
+  }
+
   Surface(
     onClick = onClick,
     shape = MaterialTheme.shapes.medium,
@@ -82,11 +91,54 @@ private fun SessionRow(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      Text(entry.displayName ?: entry.key, style = MaterialTheme.typography.bodyMedium)
-      Spacer(modifier = Modifier.weight(1f))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(entry.displayName ?: entry.key, style = MaterialTheme.typography.bodyMedium)
+        if (timestampText != null) {
+          Text(
+            timestampText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
       if (isCurrent) {
         Text("Current", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
+    }
+  }
+}
+
+/**
+ * Format a timestamp as a relative/abbreviated string.
+ *
+ * - Just now (< 1 min)
+ * - Nm (< 60 min)
+ * - Nh (< 24 hours)
+ * - Yesterday HH:mm
+ * - d MMM (older)
+ */
+private fun formatRelativeTimestamp(timestampMs: Long?): String? {
+  if (timestampMs == null || timestampMs <= 0) return null
+
+  val now = System.currentTimeMillis()
+  val diffMs = now - timestampMs
+  if (diffMs < 0) return null
+
+  val diffMinutes = TimeUnit.MILLISECONDS.toMinutes(diffMs)
+  val diffHours = TimeUnit.MILLISECONDS.toHours(diffMs)
+  val diffDays = TimeUnit.MILLISECONDS.toDays(diffMs)
+
+  return when {
+    diffMinutes < 1 -> "Just now"
+    diffMinutes < 60 -> "${diffMinutes}m ago"
+    diffHours < 24 -> "${diffHours}h ago"
+    diffDays < 2 -> {
+      val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+      "Yesterday ${timeFormat.format(Date(timestampMs))}"
+    }
+    else -> {
+      val dateFormat = SimpleDateFormat("d MMM", Locale.getDefault())
+      dateFormat.format(Date(timestampMs))
     }
   }
 }
