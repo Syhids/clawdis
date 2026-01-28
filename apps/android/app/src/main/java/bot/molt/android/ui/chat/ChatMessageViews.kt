@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -38,14 +40,17 @@ import bot.molt.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
   val isUser = message.role.lowercase() == "user"
 
-  Row(
+  Column(
     modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+    horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
   ) {
     Surface(
       shape = RoundedCornerShape(16.dp),
@@ -64,7 +69,38 @@ fun ChatMessageBubble(message: ChatMessage) {
         ChatMessageBody(content = message.content, textColor = textColor)
       }
     }
+
+    message.timestampMs?.let { ts ->
+      val formattedTime = remember(ts) { formatMessageTimestamp(ts) }
+      Text(
+        text = formattedTime,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+      )
+    }
   }
+}
+
+private fun formatMessageTimestamp(timestampMs: Long): String {
+  val now = System.currentTimeMillis()
+  val date = Date(timestampMs)
+  val isToday = isSameDay(timestampMs, now)
+  val isYesterday = isSameDay(timestampMs, now - 24 * 60 * 60 * 1000)
+
+  val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+  val dateFormat = SimpleDateFormat("d MMM", Locale.getDefault())
+
+  return when {
+    isToday -> timeFormat.format(date)
+    isYesterday -> "Yesterday ${timeFormat.format(date)}"
+    else -> "${dateFormat.format(date)} ${timeFormat.format(date)}"
+  }
+}
+
+private fun isSameDay(ts1: Long, ts2: Long): Boolean {
+  val dayMs = 24 * 60 * 60 * 1000L
+  return ts1 / dayMs == ts2 / dayMs
 }
 
 @Composable
