@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
@@ -37,6 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import bot.molt.android.chat.ChatSessionEntry
 
@@ -139,13 +148,38 @@ fun ChatComposer(
         AttachmentsStrip(attachments = attachments, onRemoveAttachment = onRemoveAttachment)
       }
 
+      // Helper to perform send action
+      val performSend = {
+        if (canSend) {
+          val text = input
+          input = ""
+          onSend(text)
+        }
+      }
+
       OutlinedTextField(
         value = input,
         onValueChange = { input = it },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+          .fillMaxWidth()
+          .onPreviewKeyEvent { event ->
+            // Hardware keyboard: Enter sends, Shift+Enter inserts newline
+            if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+              if (!event.isShiftPressed && canSend) {
+                performSend()
+                true
+              } else {
+                false // Let Shift+Enter insert newline
+              }
+            } else {
+              false
+            }
+          },
         placeholder = { Text("Message Clawd…") },
         minLines = 2,
         maxLines = 6,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+        keyboardActions = KeyboardActions(onSend = { performSend() }),
       )
 
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -21,11 +21,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +39,7 @@ import kotlinx.coroutines.withContext
 fun ChatMarkdown(text: String, textColor: Color) {
   val blocks = remember(text) { splitMarkdown(text) }
   val inlineCodeBg = MaterialTheme.colorScheme.surfaceContainerLow
+  val linkColor = MaterialTheme.colorScheme.primary
 
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     for (b in blocks) {
@@ -43,7 +48,11 @@ fun ChatMarkdown(text: String, textColor: Color) {
           val trimmed = b.text.trimEnd()
           if (trimmed.isEmpty()) continue
           Text(
-            text = parseInlineMarkdown(trimmed, inlineCodeBg = inlineCodeBg),
+            text = parseInlineMarkdown(
+              trimmed,
+              inlineCodeBg = inlineCodeBg,
+              linkColor = linkColor,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
           )
@@ -126,12 +135,51 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
   return out
 }
 
-private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.graphics.Color): AnnotatedString {
+// URL regex that matches http/https URLs, stopping at common delimiters
+private val urlRegex = Regex(
+  """https?://[^\s<>"'\])\[}{,]+""",
+  RegexOption.IGNORE_CASE,
+)
+
+private fun parseInlineMarkdown(
+  text: String,
+  inlineCodeBg: Color,
+  linkColor: Color,
+): AnnotatedString {
   if (text.isEmpty()) return AnnotatedString("")
+
+  // First, find all URL matches so we can skip them when parsing other markdown
+  val urlMatches = urlRegex.findAll(text).toList()
+  val linkStyle = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
 
   val out = buildAnnotatedString {
     var i = 0
     while (i < text.length) {
+      // Check if we're at the start of a URL
+      val urlMatch = urlMatches.find { it.range.first == i }
+      if (urlMatch != null) {
+        val url = urlMatch.value.trimEnd('.', ',', ')', ']', ';', ':', '!', '?')
+        val actualEnd = i + url.length
+        withLink(
+          LinkAnnotation.Url(
+            url = url,
+            styles = TextLinkStyles(style = linkStyle),
+          ),
+        ) {
+          append(url)
+        }
+        i = actualEnd
+        continue
+      }
+
+      // Skip URL ranges when checking for other markdown
+      val isInsideUrl = urlMatches.any { i in it.range }
+      if (isInsideUrl) {
+        append(text[i])
+        i += 1
+        continue
+      }
+
       if (text.startsWith("**", startIndex = i)) {
         val end = text.indexOf("**", startIndex = i + 2)
         if (end > i + 2) {
