@@ -1,5 +1,8 @@
 package bot.molt.android.ui.chat
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +41,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import bot.molt.android.chat.ChatSessionEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ChatComposer(
@@ -254,7 +265,8 @@ private fun AttachmentsStrip(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     for (att in attachments) {
-      AttachmentChip(
+      AttachmentThumbnail(
+        base64 = att.base64,
         fileName = att.fileName,
         onRemove = { onRemoveAttachment(att.id) },
       )
@@ -263,22 +275,63 @@ private fun AttachmentsStrip(
 }
 
 @Composable
-private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
-  Surface(
-    shape = RoundedCornerShape(999.dp),
-    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-  ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
+private fun AttachmentThumbnail(base64: String, fileName: String, onRemove: () -> Unit) {
+  var thumbnail by remember(base64) { mutableStateOf<ImageBitmap?>(null) }
+
+  LaunchedEffect(base64) {
+    thumbnail = withContext(Dispatchers.Default) {
+      try {
+        val bytes = Base64.decode(base64, Base64.DEFAULT)
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        bitmap?.asImageBitmap()
+      } catch (_: Throwable) {
+        null
+      }
+    }
+  }
+
+  Box(modifier = Modifier.size(64.dp)) {
+    Surface(
+      shape = RoundedCornerShape(8.dp),
+      color = MaterialTheme.colorScheme.surfaceContainerHigh,
+      modifier = Modifier.size(64.dp),
     ) {
-      Text(text = fileName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-      FilledTonalIconButton(
-        onClick = onRemove,
-        modifier = Modifier.size(30.dp),
-      ) {
-        Text("×")
+      if (thumbnail != null) {
+        Image(
+          bitmap = thumbnail!!,
+          contentDescription = fileName,
+          contentScale = ContentScale.Crop,
+          modifier = Modifier.clip(RoundedCornerShape(8.dp)),
+        )
+      } else {
+        Box(contentAlignment = Alignment.Center) {
+          Icon(
+            imageVector = Icons.Default.AttachFile,
+            contentDescription = fileName,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
+          )
+        }
+      }
+    }
+
+    // Remove button overlay
+    Surface(
+      onClick = onRemove,
+      modifier = Modifier
+        .align(Alignment.TopEnd)
+        .padding(2.dp)
+        .size(20.dp),
+      shape = RoundedCornerShape(999.dp),
+      color = MaterialTheme.colorScheme.error,
+    ) {
+      Box(contentAlignment = Alignment.Center) {
+        Icon(
+          imageVector = Icons.Default.Close,
+          contentDescription = "Remove",
+          tint = MaterialTheme.colorScheme.onError,
+          modifier = Modifier.size(14.dp),
+        )
       }
     }
   }
