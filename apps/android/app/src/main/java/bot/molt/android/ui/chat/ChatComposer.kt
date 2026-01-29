@@ -15,6 +15,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ButtonDefaults
@@ -23,6 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -146,6 +148,17 @@ fun ChatComposer(
         placeholder = { Text("Message Clawd…") },
         minLines = 2,
         maxLines = 6,
+        trailingIcon = {
+          if (input.isNotEmpty()) {
+            IconButton(onClick = { input = "" }) {
+              Icon(
+                Icons.Default.Clear,
+                contentDescription = "Clear input",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+        },
       )
 
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
