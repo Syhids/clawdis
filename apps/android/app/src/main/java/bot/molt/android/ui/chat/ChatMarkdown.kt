@@ -5,8 +5,10 @@ import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,6 +58,9 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.InlineImage -> {
           InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
         }
+        is ChatMarkdownBlock.List -> {
+          ChatListBlock(items = b.items, ordered = b.ordered, textColor = textColor, inlineCodeBg = inlineCodeBg)
+        }
       }
     }
   }
@@ -65,7 +70,10 @@ private sealed interface ChatMarkdownBlock {
   data class Text(val text: String) : ChatMarkdownBlock
   data class Code(val code: String, val language: String?) : ChatMarkdownBlock
   data class InlineImage(val mimeType: String?, val base64: String) : ChatMarkdownBlock
+  data class List(val items: kotlin.collections.List<ListItem>, val ordered: Boolean) : ChatMarkdownBlock
 }
+
+private data class ListItem(val content: String, val number: Int?)
 
 private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
   if (raw.isEmpty()) return emptyList()
@@ -104,25 +112,109 @@ private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
 
 private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
   if (text.isEmpty()) return emptyList()
-  val regex = Regex("data:image/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\\n\\r]+)")
+
+  // First, split text blocks to extract lists
+  val textBlocks = splitTextAndLists(text)
   val out = ArrayList<ChatMarkdownBlock>()
 
-  var idx = 0
-  while (idx < text.length) {
-    val m = regex.find(text, startIndex = idx) ?: break
-    val start = m.range.first
-    val end = m.range.last + 1
-    if (start > idx) out.add(ChatMarkdownBlock.Text(text.substring(idx, start)))
-
-    val mime = "image/" + (m.groupValues.getOrNull(1)?.trim()?.ifEmpty { "png" } ?: "png")
-    val b64 = m.groupValues.getOrNull(2)?.replace("\n", "")?.replace("\r", "")?.trim().orEmpty()
-    if (b64.isNotEmpty()) {
-      out.add(ChatMarkdownBlock.InlineImage(mimeType = mime, base64 = b64))
+  for (block in textBlocks) {
+    if (block is ChatMarkdownBlock.List) {
+      out.add(block)
+      continue
     }
-    idx = end
+    if (block !is ChatMarkdownBlock.Text) {
+      out.add(block)
+      continue
+    }
+
+    // Process inline images within text blocks
+    val blockText = block.text
+    val regex = Regex("data:image/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\\n\\r]+)")
+    var idx = 0
+    while (idx < blockText.length) {
+      val m = regex.find(blockText, startIndex = idx) ?: break
+      val start = m.range.first
+      val end = m.range.last + 1
+      if (start > idx) out.add(ChatMarkdownBlock.Text(blockText.substring(idx, start)))
+
+      val mime = "image/" + (m.groupValues.getOrNull(1)?.trim()?.ifEmpty { "png" } ?: "png")
+      val b64 = m.groupValues.getOrNull(2)?.replace("\n", "")?.replace("\r", "")?.trim().orEmpty()
+      if (b64.isNotEmpty()) {
+        out.add(ChatMarkdownBlock.InlineImage(mimeType = mime, base64 = b64))
+      }
+      idx = end
+    }
+
+    if (idx < blockText.length) out.add(ChatMarkdownBlock.Text(blockText.substring(idx)))
   }
 
-  if (idx < text.length) out.add(ChatMarkdownBlock.Text(text.substring(idx)))
+  return out
+}
+
+private val unorderedListPattern = Regex("""^[ \t]*[-*+][ \t]+(.*)$""")
+private val orderedListPattern = Regex("""^[ \t]*(\d+)[.)]\s+(.*)$""")
+
+private fun splitTextAndLists(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+
+  val lines = text.split('\n')
+  val out = ArrayList<ChatMarkdownBlock>()
+  val pendingText = StringBuilder()
+  val pendingListItems = ArrayList<ListItem>()
+  var currentListOrdered: Boolean? = null
+
+  fun flushText() {
+    if (pendingText.isNotEmpty()) {
+      out.add(ChatMarkdownBlock.Text(pendingText.toString()))
+      pendingText.clear()
+    }
+  }
+
+  fun flushList() {
+    if (pendingListItems.isNotEmpty() && currentListOrdered != null) {
+      out.add(ChatMarkdownBlock.List(items = pendingListItems.toList(), ordered = currentListOrdered!!))
+      pendingListItems.clear()
+      currentListOrdered = null
+    }
+  }
+
+  for (line in lines) {
+    val unorderedMatch = unorderedListPattern.matchEntire(line)
+    val orderedMatch = orderedListPattern.matchEntire(line)
+
+    when {
+      unorderedMatch != null -> {
+        // Check if we need to switch list type or start new list
+        if (currentListOrdered != false) {
+          flushList()
+          flushText()
+          currentListOrdered = false
+        }
+        val content = unorderedMatch.groupValues[1].trim()
+        pendingListItems.add(ListItem(content = content, number = null))
+      }
+      orderedMatch != null -> {
+        if (currentListOrdered != true) {
+          flushList()
+          flushText()
+          currentListOrdered = true
+        }
+        val num = orderedMatch.groupValues[1].toIntOrNull() ?: (pendingListItems.size + 1)
+        val content = orderedMatch.groupValues[2].trim()
+        pendingListItems.add(ListItem(content = content, number = num))
+      }
+      else -> {
+        // Not a list item
+        flushList()
+        if (pendingText.isNotEmpty()) pendingText.append('\n')
+        pendingText.append(line)
+      }
+    }
+  }
+
+  flushList()
+  flushText()
+
   return out
 }
 
@@ -175,6 +267,34 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
     }
   }
   return out
+}
+
+@Composable
+private fun ChatListBlock(
+  items: kotlin.collections.List<ListItem>,
+  ordered: Boolean,
+  textColor: Color,
+  inlineCodeBg: Color,
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    for ((index, item) in items.withIndex()) {
+      Row(modifier = Modifier.fillMaxWidth()) {
+        val bullet = if (ordered) "${item.number ?: (index + 1)}." else "•"
+        Text(
+          text = bullet,
+          modifier = Modifier.width(24.dp),
+          style = MaterialTheme.typography.bodyMedium,
+          color = textColor,
+        )
+        Text(
+          text = parseInlineMarkdown(item.content, inlineCodeBg = inlineCodeBg),
+          style = MaterialTheme.typography.bodyMedium,
+          color = textColor,
+          modifier = Modifier.weight(1f),
+        )
+      }
+    }
+  }
 }
 
 @Composable
