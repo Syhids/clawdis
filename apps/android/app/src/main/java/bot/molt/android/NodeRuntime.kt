@@ -284,6 +284,7 @@ class NodeRuntime(context: Context) {
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
   val manualTls: StateFlow<Boolean> = prefs.manualTls
+  val manualToken: StateFlow<String> = prefs.manualToken
   val lastDiscoveredStableId: StateFlow<String> = prefs.lastDiscoveredStableId
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled
 
@@ -426,6 +427,10 @@ class NodeRuntime(context: Context) {
 
   fun setManualTls(value: Boolean) {
     prefs.setManualTls(value)
+  }
+
+  fun setManualToken(value: String) {
+    prefs.setManualToken(value)
   }
 
   fun setCanvasDebugStatusEnabled(value: Boolean) {
@@ -603,6 +608,11 @@ class NodeRuntime(context: Context) {
     if (host.isEmpty() || port <= 0 || port > 65535) {
       _statusText.value = "Failed: invalid manual host/port"
       return
+    }
+    // Save manual token to the per-instance token slot so connect() picks it up
+    val manualTokenValue = manualToken.value.trim()
+    if (manualTokenValue.isNotEmpty()) {
+      prefs.saveGatewayToken(manualTokenValue)
     }
     connect(GatewayEndpoint.manual(host = host, port = port))
   }
