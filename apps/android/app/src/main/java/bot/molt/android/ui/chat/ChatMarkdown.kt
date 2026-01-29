@@ -26,6 +26,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +133,7 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
   val out = buildAnnotatedString {
     var i = 0
     while (i < text.length) {
+      // Bold: **text**
       if (text.startsWith("**", startIndex = i)) {
         val end = text.indexOf("**", startIndex = i + 2)
         if (end > i + 2) {
@@ -143,6 +145,19 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
         }
       }
 
+      // Strikethrough: ~~text~~
+      if (text.startsWith("~~", startIndex = i)) {
+        val end = text.indexOf("~~", startIndex = i + 2)
+        if (end > i + 2) {
+          withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
+            append(text.substring(i + 2, end))
+          }
+          i = end + 2
+          continue
+        }
+      }
+
+      // Inline code: `code`
       if (text[i] == '`') {
         val end = text.indexOf('`', startIndex = i + 1)
         if (end > i + 1) {
@@ -159,6 +174,7 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
         }
       }
 
+      // Italic: *text*
       if (text[i] == '*' && (i + 1 < text.length && text[i + 1] != '*')) {
         val end = text.indexOf('*', startIndex = i + 1)
         if (end > i + 1) {
