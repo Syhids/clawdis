@@ -56,6 +56,9 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.InlineImage -> {
           InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
         }
+        is ChatMarkdownBlock.Heading -> {
+          ChatHeadingBlock(level = b.level, text = b.text, textColor = textColor, inlineCodeBg = inlineCodeBg)
+        }
       }
     }
   }
@@ -65,6 +68,7 @@ private sealed interface ChatMarkdownBlock {
   data class Text(val text: String) : ChatMarkdownBlock
   data class Code(val code: String, val language: String?) : ChatMarkdownBlock
   data class InlineImage(val mimeType: String?, val base64: String) : ChatMarkdownBlock
+  data class Heading(val level: Int, val text: String) : ChatMarkdownBlock
 }
 
 private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
@@ -112,7 +116,7 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
     val m = regex.find(text, startIndex = idx) ?: break
     val start = m.range.first
     val end = m.range.last + 1
-    if (start > idx) out.add(ChatMarkdownBlock.Text(text.substring(idx, start)))
+    if (start > idx) out.addAll(splitHeadings(text.substring(idx, start)))
 
     val mime = "image/" + (m.groupValues.getOrNull(1)?.trim()?.ifEmpty { "png" } ?: "png")
     val b64 = m.groupValues.getOrNull(2)?.replace("\n", "")?.replace("\r", "")?.trim().orEmpty()
@@ -122,7 +126,39 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
     idx = end
   }
 
-  if (idx < text.length) out.add(ChatMarkdownBlock.Text(text.substring(idx)))
+  if (idx < text.length) out.addAll(splitHeadings(text.substring(idx)))
+  return out
+}
+
+private val headingRegex = Regex("^(#{1,6})\\s+(.+)$")
+
+private fun splitHeadings(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+  val out = ArrayList<ChatMarkdownBlock>()
+  val textBuffer = StringBuilder()
+
+  for (line in text.lines()) {
+    val match = headingRegex.matchEntire(line.trimEnd())
+    if (match != null) {
+      // Flush any accumulated text first
+      if (textBuffer.isNotEmpty()) {
+        out.add(ChatMarkdownBlock.Text(textBuffer.toString()))
+        textBuffer.clear()
+      }
+      val level = match.groupValues[1].length
+      val headingText = match.groupValues[2].trim()
+      out.add(ChatMarkdownBlock.Heading(level = level, text = headingText))
+    } else {
+      if (textBuffer.isNotEmpty()) textBuffer.append("\n")
+      textBuffer.append(line)
+    }
+  }
+
+  // Flush remaining text
+  if (textBuffer.isNotEmpty()) {
+    out.add(ChatMarkdownBlock.Text(textBuffer.toString()))
+  }
+
   return out
 }
 
@@ -175,6 +211,23 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
     }
   }
   return out
+}
+
+@Composable
+private fun ChatHeadingBlock(level: Int, text: String, textColor: Color, inlineCodeBg: Color) {
+  val style = when (level) {
+    1 -> MaterialTheme.typography.headlineMedium
+    2 -> MaterialTheme.typography.headlineSmall
+    3 -> MaterialTheme.typography.titleLarge
+    4 -> MaterialTheme.typography.titleMedium
+    5 -> MaterialTheme.typography.titleSmall
+    else -> MaterialTheme.typography.labelLarge
+  }
+  Text(
+    text = parseInlineMarkdown(text, inlineCodeBg = inlineCodeBg),
+    style = style.copy(fontWeight = FontWeight.SemiBold),
+    color = textColor,
+  )
 }
 
 @Composable
