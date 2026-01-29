@@ -5,9 +5,15 @@ import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -26,6 +33,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +64,14 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.InlineImage -> {
           InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
         }
+        is ChatMarkdownBlock.TaskItem -> {
+          ChatTaskItem(
+            checked = b.checked,
+            text = b.text,
+            textColor = textColor,
+            inlineCodeBg = inlineCodeBg,
+          )
+        }
       }
     }
   }
@@ -65,6 +81,7 @@ private sealed interface ChatMarkdownBlock {
   data class Text(val text: String) : ChatMarkdownBlock
   data class Code(val code: String, val language: String?) : ChatMarkdownBlock
   data class InlineImage(val mimeType: String?, val base64: String) : ChatMarkdownBlock
+  data class TaskItem(val checked: Boolean, val text: String) : ChatMarkdownBlock
 }
 
 private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
@@ -112,7 +129,7 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
     val m = regex.find(text, startIndex = idx) ?: break
     val start = m.range.first
     val end = m.range.last + 1
-    if (start > idx) out.add(ChatMarkdownBlock.Text(text.substring(idx, start)))
+    if (start > idx) out.addAll(splitTaskItems(text.substring(idx, start)))
 
     val mime = "image/" + (m.groupValues.getOrNull(1)?.trim()?.ifEmpty { "png" } ?: "png")
     val b64 = m.groupValues.getOrNull(2)?.replace("\n", "")?.replace("\r", "")?.trim().orEmpty()
@@ -122,7 +139,42 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
     idx = end
   }
 
-  if (idx < text.length) out.add(ChatMarkdownBlock.Text(text.substring(idx)))
+  if (idx < text.length) out.addAll(splitTaskItems(text.substring(idx)))
+  return out
+}
+
+private val taskItemRegex = Regex("""^[\s]*[-*+]\s+\[([ xX])\]\s+(.*)$""")
+
+private fun splitTaskItems(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+
+  val lines = text.lines()
+  val out = ArrayList<ChatMarkdownBlock>()
+  val textBuffer = StringBuilder()
+
+  for (line in lines) {
+    val match = taskItemRegex.matchEntire(line)
+    if (match != null) {
+      // Flush any accumulated text
+      if (textBuffer.isNotEmpty()) {
+        out.add(ChatMarkdownBlock.Text(textBuffer.toString()))
+        textBuffer.clear()
+      }
+      val checkChar = match.groupValues[1]
+      val taskText = match.groupValues[2]
+      val checked = checkChar.lowercase() == "x"
+      out.add(ChatMarkdownBlock.TaskItem(checked = checked, text = taskText))
+    } else {
+      if (textBuffer.isNotEmpty()) textBuffer.append("\n")
+      textBuffer.append(line)
+    }
+  }
+
+  // Flush remaining text
+  if (textBuffer.isNotEmpty()) {
+    out.add(ChatMarkdownBlock.Text(textBuffer.toString()))
+  }
+
   return out
 }
 
@@ -175,6 +227,37 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
     }
   }
   return out
+}
+
+@Composable
+private fun ChatTaskItem(
+  checked: Boolean,
+  text: String,
+  textColor: Color,
+  inlineCodeBg: Color,
+) {
+  Row(
+    verticalAlignment = Alignment.Top,
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Icon(
+      imageVector = if (checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+      contentDescription = if (checked) "Completed" else "Not completed",
+      tint = if (checked) {
+        MaterialTheme.colorScheme.primary
+      } else {
+        textColor.copy(alpha = 0.6f)
+      },
+      modifier = Modifier.size(20.dp),
+    )
+    Text(
+      text = parseInlineMarkdown(text, inlineCodeBg = inlineCodeBg),
+      style = MaterialTheme.typography.bodyMedium,
+      color = if (checked) textColor.copy(alpha = 0.6f) else textColor,
+      textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
+    )
+  }
 }
 
 @Composable
