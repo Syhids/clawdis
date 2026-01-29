@@ -236,17 +236,43 @@ private fun PulseDot(alpha: Float) {
 
 @Composable
 fun ChatCodeBlock(code: String, language: String?) {
+  val lines = remember(code) { code.trimEnd().lines() }
+  val lineNumberWidth = remember(lines.size) {
+    lines.size.toString().length
+  }
+
   Surface(
     shape = RoundedCornerShape(12.dp),
     color = MaterialTheme.colorScheme.surfaceContainerLowest,
     modifier = Modifier.fillMaxWidth(),
   ) {
-    Text(
-      text = code.trimEnd(),
-      modifier = Modifier.padding(10.dp),
-      fontFamily = FontFamily.Monospace,
-      style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
+    Row(modifier = Modifier.padding(10.dp)) {
+      // Line numbers column
+      Column(
+        modifier = Modifier.padding(end = 12.dp),
+        horizontalAlignment = Alignment.End,
+      ) {
+        for (i in lines.indices) {
+          Text(
+            text = (i + 1).toString().padStart(lineNumberWidth),
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+          )
+        }
+      }
+
+      // Code column
+      Column {
+        for (line in lines) {
+          Text(
+            text = line.ifEmpty { " " },
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
+        }
+      }
+    }
   }
 }
