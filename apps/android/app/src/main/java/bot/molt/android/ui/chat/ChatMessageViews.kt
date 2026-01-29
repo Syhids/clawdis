@@ -3,6 +3,7 @@ package bot.molt.android.ui.chat
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -241,12 +243,16 @@ fun ChatCodeBlock(code: String, language: String?) {
     color = MaterialTheme.colorScheme.surfaceContainerLowest,
     modifier = Modifier.fillMaxWidth(),
   ) {
+    val scrollState = rememberScrollState()
     Text(
       text = code.trimEnd(),
-      modifier = Modifier.padding(10.dp),
+      modifier = Modifier
+        .horizontalScroll(scrollState)
+        .padding(10.dp),
       fontFamily = FontFamily.Monospace,
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurface,
+      softWrap = false,
     )
   }
 }
