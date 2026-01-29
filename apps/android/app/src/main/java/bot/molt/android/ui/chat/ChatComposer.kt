@@ -152,6 +152,16 @@ fun ChatComposer(
         ConnectionPill(sessionLabel = currentSessionLabel, healthOk = healthOk)
         Spacer(modifier = Modifier.weight(1f))
 
+        // Character counter - only show when there's text
+        if (input.isNotEmpty()) {
+          Text(
+            text = "${input.length}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 8.dp),
+          )
+        }
+
         if (pendingRunCount > 0) {
           FilledTonalIconButton(
             onClick = onAbort,
