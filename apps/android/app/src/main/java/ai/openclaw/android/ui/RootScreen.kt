@@ -49,6 +49,13 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,10 +64,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Surface
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
@@ -88,6 +97,9 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
+  val pendingRunCount by viewModel.pendingRunCount.collectAsState()
+  val pendingToolCalls by viewModel.chatPendingToolCalls.collectAsState()
+  val hasActiveChat = pendingRunCount > 0 || pendingToolCalls.isNotEmpty()
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
@@ -220,9 +232,9 @@ fun RootScreen(viewModel: MainViewModel) {
       verticalArrangement = Arrangement.spacedBy(10.dp),
       horizontalAlignment = Alignment.End,
     ) {
-      OverlayIconButton(
+      ChatButtonWithBadge(
         onClick = { sheet = Sheet.Chat },
-        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
+        hasActivity = hasActiveChat,
       )
 
       // Talk mode gets a dedicated side bubble instead of burying it in settings.
@@ -426,4 +438,50 @@ private class CanvasA2UIActionBridge(private val onMessage: (String) -> Unit) {
   companion object {
     const val interfaceName: String = "openclawCanvasA2UIAction"
   }
+}
+
+@Composable
+private fun ChatButtonWithBadge(
+  onClick: () -> Unit,
+  hasActivity: Boolean,
+) {
+  Box(modifier = Modifier.size(44.dp)) {
+    FilledTonalIconButton(
+      onClick = onClick,
+      modifier = Modifier.fillMaxSize(),
+      colors =
+        IconButtonDefaults.filledTonalIconButtonColors(
+          containerColor = overlayContainerColor(),
+          contentColor = overlayIconColor(),
+        ),
+    ) {
+      Icon(Icons.Default.ChatBubble, contentDescription = "Chat")
+    }
+
+    if (hasActivity) {
+      ActivityBadge(
+        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+      )
+    }
+  }
+}
+
+@Composable
+private fun ActivityBadge(modifier: Modifier = Modifier) {
+  val infiniteTransition = rememberInfiniteTransition(label = "activityBadge")
+  val alpha by infiniteTransition.animateFloat(
+    initialValue = 0.5f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(durationMillis = 800, easing = LinearEasing),
+      repeatMode = RepeatMode.Reverse,
+    ),
+    label = "badgeAlpha",
+  )
+
+  Surface(
+    modifier = modifier.size(10.dp).alpha(alpha),
+    shape = CircleShape,
+    color = ComposeColor(0xFF2ECC71), // Green accent
+  ) {}
 }
