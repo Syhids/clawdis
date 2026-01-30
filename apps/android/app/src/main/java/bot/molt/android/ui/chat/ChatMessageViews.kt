@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,7 +38,9 @@ import bot.molt.android.chat.ChatMessage
 import bot.molt.android.chat.ChatMessageContent
 import bot.molt.android.chat.ChatPendingToolCall
 import bot.molt.android.tools.ToolDisplayRegistry
+import bot.molt.android.tools.ToolDisplaySummary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 
@@ -109,8 +114,18 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
   val context = LocalContext.current
   val displays =
     remember(toolCalls, context) {
-      toolCalls.map { ToolDisplayRegistry.resolve(context, it.name, it.args) }
+      toolCalls.map { call -> call to ToolDisplayRegistry.resolve(context, call.name, call.args) }
     }
+
+  // Timer that ticks every second to update elapsed times
+  var tickMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      delay(1000L)
+      tickMs = System.currentTimeMillis()
+    }
+  }
+
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
     Surface(
       shape = RoundedCornerShape(16.dp),
@@ -118,23 +133,8 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
     ) {
       Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Running tools…", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-        for (display in displays.take(6)) {
-          Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-              "${display.emoji} ${display.label}",
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              fontFamily = FontFamily.Monospace,
-            )
-            display.detailLine?.let { detail ->
-              Text(
-                detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Monospace,
-              )
-            }
-          }
+        for ((call, display) in displays.take(6)) {
+          ToolCallRow(call = call, display = display, tickMs = tickMs)
         }
         if (toolCalls.size > 6) {
           Text(
@@ -145,6 +145,52 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
         }
       }
     }
+  }
+}
+
+@Composable
+private fun ToolCallRow(call: ChatPendingToolCall, display: ToolDisplaySummary, tickMs: Long) {
+  val elapsedMs = (tickMs - call.startedAtMs).coerceAtLeast(0)
+  val elapsedText = formatElapsedTime(elapsedMs)
+
+  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Text(
+        "${display.emoji} ${display.label}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontFamily = FontFamily.Monospace,
+      )
+      Spacer(modifier = Modifier.width(4.dp))
+      Text(
+        elapsedText,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        fontFamily = FontFamily.Monospace,
+      )
+    }
+    display.detailLine?.let { detail ->
+      Text(
+        detail,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontFamily = FontFamily.Monospace,
+      )
+    }
+  }
+}
+
+private fun formatElapsedTime(ms: Long): String {
+  val totalSeconds = ms / 1000
+  return if (totalSeconds < 60) {
+    "${totalSeconds}s"
+  } else {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    "${minutes}m ${seconds}s"
   }
 }
 
