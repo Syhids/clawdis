@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,6 +57,13 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.InlineImage -> {
           InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
         }
+        is ChatMarkdownBlock.HorizontalRule -> {
+          HorizontalDivider(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            thickness = 1.dp,
+            color = textColor.copy(alpha = 0.25f),
+          )
+        }
       }
     }
   }
@@ -65,6 +73,7 @@ private sealed interface ChatMarkdownBlock {
   data class Text(val text: String) : ChatMarkdownBlock
   data class Code(val code: String, val language: String?) : ChatMarkdownBlock
   data class InlineImage(val mimeType: String?, val base64: String) : ChatMarkdownBlock
+  data object HorizontalRule : ChatMarkdownBlock
 }
 
 private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
@@ -103,6 +112,54 @@ private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
 }
 
 private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+
+  // First, split by horizontal rules (lines that are only ---, ***, or ___ with 3+ chars)
+  val withHr = splitHorizontalRules(text)
+  val out = ArrayList<ChatMarkdownBlock>()
+
+  for (block in withHr) {
+    if (block is ChatMarkdownBlock.HorizontalRule) {
+      out.add(block)
+      continue
+    }
+    val textBlock = block as ChatMarkdownBlock.Text
+    out.addAll(splitBase64Images(textBlock.text))
+  }
+
+  return out
+}
+
+private val horizontalRulePattern = Regex("^\\s*([-*_])\\1{2,}\\s*$")
+
+private fun splitHorizontalRules(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+
+  val lines = text.split('\n')
+  val out = ArrayList<ChatMarkdownBlock>()
+  val pending = StringBuilder()
+
+  for (line in lines) {
+    if (horizontalRulePattern.matches(line)) {
+      if (pending.isNotEmpty()) {
+        out.add(ChatMarkdownBlock.Text(pending.toString()))
+        pending.clear()
+      }
+      out.add(ChatMarkdownBlock.HorizontalRule)
+    } else {
+      if (pending.isNotEmpty()) pending.append('\n')
+      pending.append(line)
+    }
+  }
+
+  if (pending.isNotEmpty()) {
+    out.add(ChatMarkdownBlock.Text(pending.toString()))
+  }
+
+  return out
+}
+
+private fun splitBase64Images(text: String): List<ChatMarkdownBlock> {
   if (text.isEmpty()) return emptyList()
   val regex = Regex("data:image/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\\n\\r]+)")
   val out = ArrayList<ChatMarkdownBlock>()
