@@ -1,5 +1,6 @@
 package ai.openclaw.android.ui.chat
 
+import android.view.KeyEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,8 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.chat.ChatSessionEntry
+
+private const val MAX_INPUT_HISTORY = 50
 
 @Composable
 fun ChatComposer(
@@ -61,6 +67,11 @@ fun ChatComposer(
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
   var showSessionMenu by remember { mutableStateOf(false) }
+
+  // Input history for ↑/↓ navigation (like terminal)
+  val inputHistory = remember { mutableStateListOf<String>() }
+  var historyIndex by remember { mutableIntStateOf(-1) }
+  var draftInput by remember { mutableStateOf("") }
 
   val sessionOptions = resolveSessionChoices(sessionKey, sessions, mainSessionKey = mainSessionKey)
   val currentSessionLabel =
@@ -141,8 +152,50 @@ fun ChatComposer(
 
       OutlinedTextField(
         value = input,
-        onValueChange = { input = it },
-        modifier = Modifier.fillMaxWidth(),
+        onValueChange = {
+          input = it
+          // Reset history navigation when user types manually
+          if (historyIndex != -1) {
+            historyIndex = -1
+          }
+        },
+        modifier = Modifier
+          .fillMaxWidth()
+          .onPreviewKeyEvent { keyEvent ->
+            // Only handle key down events
+            if (keyEvent.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@onPreviewKeyEvent false
+            
+            when (keyEvent.nativeKeyEvent.keyCode) {
+              KeyEvent.KEYCODE_DPAD_UP -> {
+                // Navigate to older messages
+                if (inputHistory.isEmpty()) return@onPreviewKeyEvent false
+                if (historyIndex == -1) {
+                  // Starting navigation: save current input as draft
+                  draftInput = input
+                  historyIndex = inputHistory.lastIndex
+                  input = inputHistory[historyIndex]
+                } else if (historyIndex > 0) {
+                  historyIndex--
+                  input = inputHistory[historyIndex]
+                }
+                true
+              }
+              KeyEvent.KEYCODE_DPAD_DOWN -> {
+                // Navigate to newer messages
+                if (historyIndex == -1) return@onPreviewKeyEvent false
+                if (historyIndex < inputHistory.lastIndex) {
+                  historyIndex++
+                  input = inputHistory[historyIndex]
+                } else {
+                  // Reached end of history: restore draft
+                  historyIndex = -1
+                  input = draftInput
+                }
+                true
+              }
+              else -> false
+            }
+          },
         placeholder = { Text("Message OpenClaw…") },
         minLines = 2,
         maxLines = 6,
@@ -165,7 +218,20 @@ fun ChatComposer(
           }
         } else {
           FilledTonalIconButton(onClick = {
-            val text = input
+            val text = input.trim()
+            if (text.isNotEmpty()) {
+              // Add to input history (avoid duplicates of last entry)
+              if (inputHistory.isEmpty() || inputHistory.last() != text) {
+                inputHistory.add(text)
+                // Keep history bounded
+                if (inputHistory.size > MAX_INPUT_HISTORY) {
+                  inputHistory.removeAt(0)
+                }
+              }
+              // Reset history navigation state
+              historyIndex = -1
+              draftInput = ""
+            }
             input = ""
             onSend(text)
           }, enabled = canSend) {
