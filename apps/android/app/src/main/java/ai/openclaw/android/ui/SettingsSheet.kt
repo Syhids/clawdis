@@ -1,12 +1,15 @@
 package ai.openclaw.android.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -24,6 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,13 +36,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -279,6 +287,38 @@ fun SettingsSheet(viewModel: MainViewModel) {
     item { Text("Instance ID: $instanceId", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     item { Text("Device: $deviceModel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     item { Text("Version: $appVersion", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    item {
+      OutlinedButton(
+        onClick = {
+          val debugInfo = buildDebugInfo(
+            instanceId = instanceId,
+            displayName = displayName,
+            deviceModel = deviceModel,
+            appVersion = appVersion,
+            statusText = statusText,
+            serverName = serverName,
+            remoteAddress = remoteAddress,
+            isConnected = isConnected,
+            voiceWakeMode = voiceWakeMode,
+            locationMode = locationMode,
+            cameraEnabled = cameraEnabled,
+          )
+          val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+          val clip = ClipData.newPlainText("OpenClaw Debug Info", debugInfo)
+          clipboard.setPrimaryClip(clip)
+          Toast.makeText(context, "Debug info copied", Toast.LENGTH_SHORT).show()
+        },
+        contentPadding = ButtonDefaults.ContentPadding,
+      ) {
+        Icon(
+          Icons.Default.ContentCopy,
+          contentDescription = null,
+          modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Copy Debug Info")
+      }
+    }
 
     item { HorizontalDivider() }
 
@@ -683,4 +723,44 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+private fun buildDebugInfo(
+  instanceId: String,
+  displayName: String,
+  deviceModel: String,
+  appVersion: String,
+  statusText: String,
+  serverName: String?,
+  remoteAddress: String?,
+  isConnected: Boolean,
+  voiceWakeMode: VoiceWakeMode,
+  locationMode: LocationMode,
+  cameraEnabled: Boolean,
+): String {
+  val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", java.util.Locale.US)
+    .format(java.util.Date())
+
+  return buildString {
+    appendLine("=== OpenClaw Debug Info ===")
+    appendLine("Timestamp: $timestamp")
+    appendLine()
+    appendLine("-- Node --")
+    appendLine("Name: $displayName")
+    appendLine("Instance ID: $instanceId")
+    appendLine("Device: $deviceModel")
+    appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+    appendLine("App Version: $appVersion")
+    appendLine()
+    appendLine("-- Connection --")
+    appendLine("Status: $statusText")
+    appendLine("Connected: $isConnected")
+    if (serverName != null) appendLine("Server: $serverName")
+    if (remoteAddress != null) appendLine("Address: $remoteAddress")
+    appendLine()
+    appendLine("-- Permissions --")
+    appendLine("Voice Wake: ${voiceWakeMode.name}")
+    appendLine("Location: ${locationMode.name}")
+    appendLine("Camera: $cameraEnabled")
+  }
 }
