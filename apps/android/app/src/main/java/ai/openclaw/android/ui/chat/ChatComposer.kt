@@ -15,6 +15,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ButtonDefaults
@@ -38,12 +39,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatSessionEntry
 
 @Composable
 fun ChatComposer(
   sessionKey: String,
   sessions: List<ChatSessionEntry>,
+  messages: List<ChatMessage>,
   mainSessionKey: String,
   healthOk: Boolean,
   thinkingLevel: String,
@@ -54,6 +57,7 @@ fun ChatComposer(
   onRemoveAttachment: (id: String) -> Unit,
   onSetThinkingLevel: (level: String) -> Unit,
   onSelectSession: (sessionKey: String) -> Unit,
+  onCopyConversation: (text: String) -> Unit,
   onRefresh: () -> Unit,
   onAbort: () -> Unit,
   onSend: (text: String) -> Unit,
@@ -125,6 +129,19 @@ fun ChatComposer(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        FilledTonalIconButton(
+          onClick = {
+            val formatted = formatConversation(messages)
+            if (formatted.isNotEmpty()) {
+              onCopyConversation(formatted)
+            }
+          },
+          modifier = Modifier.size(42.dp),
+          enabled = messages.isNotEmpty(),
+        ) {
+          Icon(Icons.Default.ContentCopy, contentDescription = "Copy conversation")
+        }
 
         FilledTonalIconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
           Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -281,5 +298,32 @@ private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
         Text("×")
       }
     }
+  }
+}
+
+private fun formatConversation(messages: List<ChatMessage>): String {
+  if (messages.isEmpty()) return ""
+
+  return messages.joinToString("\n\n") { msg ->
+    val roleLabel = when (msg.role.lowercase()) {
+      "user" -> "User"
+      "assistant" -> "Assistant"
+      else -> msg.role.replaceFirstChar { it.uppercaseChar() }
+    }
+    val textParts = msg.content
+      .filter { it.type == "text" && !it.text.isNullOrBlank() }
+      .mapNotNull { it.text?.trim() }
+    val imageParts = msg.content.count { it.type == "image" }
+    val imageNote = if (imageParts > 0) " [$imageParts image${if (imageParts > 1) "s" else ""}]" else ""
+
+    val body = if (textParts.isNotEmpty()) {
+      textParts.joinToString("\n")
+    } else if (imageParts > 0) {
+      "[Image${if (imageParts > 1) "s" else ""} only]"
+    } else {
+      "[Empty message]"
+    }
+
+    "$roleLabel:$imageNote\n$body"
   }
 }

@@ -1,8 +1,12 @@
 package ai.openclaw.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.chat.OutgoingAttachment
@@ -47,6 +53,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val context = LocalContext.current
   val resolver = context.contentResolver
   val scope = rememberCoroutineScope()
+  val haptic = LocalHapticFeedback.current
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
 
@@ -86,6 +93,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
     ChatComposer(
       sessionKey = sessionKey,
       sessions = sessions,
+      messages = messages,
       mainSessionKey = mainSessionKey,
       healthOk = healthOk,
       thinkingLevel = thinkingLevel,
@@ -96,6 +104,13 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
       onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
       onSelectSession = { key -> viewModel.switchChatSession(key) },
+      onCopyConversation = { text ->
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("OpenClaw Conversation", text)
+        clipboard.setPrimaryClip(clip)
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        Toast.makeText(context, "Conversation copied to clipboard", Toast.LENGTH_SHORT).show()
+      },
       onRefresh = {
         viewModel.refreshChat()
         viewModel.refreshChatSessions(limit = 200)
