@@ -38,6 +38,7 @@ import ai.openclaw.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
@@ -69,12 +70,37 @@ fun ChatMessageBubble(message: ChatMessage) {
 
 @Composable
 private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color) {
+  // Check if this is an emoji-only message (1-5 emojis, no other text)
+  val emojiOnlyInfo = remember(content) { detectEmojiOnlyMessage(content) }
+
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     for (part in content) {
       when (part.type) {
         "text" -> {
           val text = part.text ?: continue
-          ChatMarkdown(text = text, textColor = textColor)
+          if (emojiOnlyInfo != null) {
+            // Render emojis in large size without bubble formatting
+            Text(
+              text = text,
+              style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = when (emojiOnlyInfo.emojiCount) {
+                  1 -> 48.sp
+                  2 -> 40.sp
+                  3 -> 36.sp
+                  else -> 32.sp
+                },
+                lineHeight = when (emojiOnlyInfo.emojiCount) {
+                  1 -> 56.sp
+                  2 -> 48.sp
+                  3 -> 44.sp
+                  else -> 40.sp
+                },
+              ),
+              color = textColor,
+            )
+          } else {
+            ChatMarkdown(text = text, textColor = textColor)
+          }
         }
         else -> {
           val b64 = part.base64 ?: continue
@@ -83,6 +109,176 @@ private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color)
       }
     }
   }
+}
+
+/**
+ * Detects if a message contains only emojis (1-5 emojis, no other text or attachments).
+ * Returns EmojiOnlyInfo if true, null otherwise.
+ */
+private data class EmojiOnlyInfo(val emojiCount: Int)
+
+private fun detectEmojiOnlyMessage(content: List<ChatMessageContent>): EmojiOnlyInfo? {
+  // Must have exactly one text part and no other parts (no images/attachments)
+  val textParts = content.filter { it.type == "text" && !it.text.isNullOrBlank() }
+  val otherParts = content.filter { it.type != "text" }
+  if (textParts.size != 1 || otherParts.isNotEmpty()) return null
+
+  val text = textParts.first().text?.trim() ?: return null
+  if (text.isEmpty()) return null
+
+  // Count emojis and check that the message contains only emojis
+  val emojiCount = countEmojis(text)
+  if (emojiCount == 0 || emojiCount > 5) return null
+
+  // Verify that removing all emojis leaves nothing (only whitespace allowed)
+  val withoutEmojis = removeEmojis(text).trim()
+  if (withoutEmojis.isNotEmpty()) return null
+
+  return EmojiOnlyInfo(emojiCount = emojiCount)
+}
+
+/**
+ * Counts the number of emoji grapheme clusters in the text.
+ * Uses Unicode properties to detect emojis, including:
+ * - Basic emojis (😀, 🎉, ❤️, etc.)
+ * - Emoji sequences (👨‍👩‍👧, 🇪🇸, etc.)
+ * - Emoji with skin tone modifiers (👋🏻, 👨🏽, etc.)
+ */
+private fun countEmojis(text: String): Int {
+  // Regex pattern for emoji detection
+  // Covers: emoji presentation sequences, ZWJ sequences, flags, modifiers
+  val emojiPattern = Regex(
+    "(?:" +
+      // Emoji ZWJ sequences (family, profession emojis)
+      "(?:\\p{Emoji}(?:\\p{EMod})?(?:\\x{200D}\\p{Emoji}(?:\\p{EMod})?)+)" +
+      "|" +
+      // Regional indicator pairs (flags)
+      "(?:[\\x{1F1E6}-\\x{1F1FF}]{2})" +
+      "|" +
+      // Emoji with optional modifier or variation selector
+      "(?:\\p{Emoji}(?:\\p{EMod}|\\x{FE0F})?)" +
+      ")",
+    RegexOption.COMMENTS,
+  )
+
+  // Simplified fallback: count using a more compatible pattern
+  val simplePattern = Regex("[\\p{So}\\p{Sc}]|[\\uD83C-\\uDBFF][\\uDC00-\\uDFFF]")
+  val matches = simplePattern.findAll(text)
+
+  // Count grapheme clusters that look like emojis
+  var count = 0
+  var i = 0
+  while (i < text.length) {
+    val cp = text.codePointAt(i)
+    val charCount = Character.charCount(cp)
+
+    if (isEmojiCodePoint(cp)) {
+      count++
+      // Skip any following modifiers, variation selectors, or ZWJ sequences
+      i += charCount
+      while (i < text.length) {
+        val nextCp = text.codePointAt(i)
+        if (isEmojiModifier(nextCp) || isVariationSelector(nextCp) || isZWJ(nextCp)) {
+          i += Character.charCount(nextCp)
+          // If ZWJ, also consume the next emoji
+          if (isZWJ(nextCp) && i < text.length) {
+            val afterZwj = text.codePointAt(i)
+            if (isEmojiCodePoint(afterZwj)) {
+              i += Character.charCount(afterZwj)
+            }
+          }
+        } else {
+          break
+        }
+      }
+    } else if (Character.isWhitespace(cp)) {
+      i += charCount
+    } else {
+      i += charCount
+    }
+  }
+
+  return count
+}
+
+private fun removeEmojis(text: String): String {
+  val sb = StringBuilder()
+  var i = 0
+  while (i < text.length) {
+    val cp = text.codePointAt(i)
+    val charCount = Character.charCount(cp)
+
+    if (isEmojiCodePoint(cp)) {
+      // Skip emoji and any modifiers/ZWJ sequences
+      i += charCount
+      while (i < text.length) {
+        val nextCp = text.codePointAt(i)
+        if (isEmojiModifier(nextCp) || isVariationSelector(nextCp) || isZWJ(nextCp)) {
+          i += Character.charCount(nextCp)
+          if (isZWJ(nextCp) && i < text.length) {
+            val afterZwj = text.codePointAt(i)
+            if (isEmojiCodePoint(afterZwj)) {
+              i += Character.charCount(afterZwj)
+            }
+          }
+        } else {
+          break
+        }
+      }
+    } else {
+      sb.appendCodePoint(cp)
+      i += charCount
+    }
+  }
+  return sb.toString()
+}
+
+private fun isEmojiCodePoint(cp: Int): Boolean {
+  // Common emoji ranges
+  return when {
+    // Emoticons
+    cp in 0x1F600..0x1F64F -> true
+    // Misc symbols and pictographs
+    cp in 0x1F300..0x1F5FF -> true
+    // Transport and map symbols
+    cp in 0x1F680..0x1F6FF -> true
+    // Symbols and Pictographs Extended-A
+    cp in 0x1FA70..0x1FAFF -> true
+    // Supplemental symbols and pictographs
+    cp in 0x1F900..0x1F9FF -> true
+    // Regional indicator symbols (flags)
+    cp in 0x1F1E0..0x1F1FF -> true
+    // Dingbats
+    cp in 0x2700..0x27BF -> true
+    // Misc symbols
+    cp in 0x2600..0x26FF -> true
+    // Some specific emojis
+    cp == 0x2764 -> true // ❤
+    cp == 0x2763 -> true // ❣
+    cp == 0x2618 -> true // ☘
+    cp == 0x2639 -> true // ☹
+    cp == 0x263A -> true // ☺
+    cp == 0x270C -> true // ✌
+    cp == 0x270D -> true // ✍
+    cp == 0x270B -> true // ✋
+    // Enclosed alphanumerics supplement (some are emoji)
+    cp in 0x1F170..0x1F1FF -> true
+    else -> false
+  }
+}
+
+private fun isEmojiModifier(cp: Int): Boolean {
+  // Skin tone modifiers
+  return cp in 0x1F3FB..0x1F3FF
+}
+
+private fun isVariationSelector(cp: Int): Boolean {
+  // FE0F is emoji presentation selector, FE0E is text presentation
+  return cp == 0xFE0F || cp == 0xFE0E
+}
+
+private fun isZWJ(cp: Int): Boolean {
+  return cp == 0x200D
 }
 
 @Composable
