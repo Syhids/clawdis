@@ -2,16 +2,23 @@ package ai.openclaw.android.ui.chat
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -234,19 +241,101 @@ private fun PulseDot(alpha: Float) {
   ) {}
 }
 
+private const val COLLAPSE_THRESHOLD_LINES = 15
+
 @Composable
 fun ChatCodeBlock(code: String, language: String?) {
+  val trimmedCode = code.trimEnd()
+  val lines = remember(trimmedCode) { trimmedCode.lines() }
+  val lineCount = lines.size
+  val isCollapsible = lineCount > COLLAPSE_THRESHOLD_LINES
+  var isExpanded by remember { mutableStateOf(false) }
+
+  val displayedCode = remember(trimmedCode, isExpanded, isCollapsible) {
+    if (isCollapsible && !isExpanded) {
+      lines.take(COLLAPSE_THRESHOLD_LINES).joinToString("\n")
+    } else {
+      trimmedCode
+    }
+  }
+
   Surface(
     shape = RoundedCornerShape(12.dp),
     color = MaterialTheme.colorScheme.surfaceContainerLowest,
     modifier = Modifier.fillMaxWidth(),
   ) {
-    Text(
-      text = code.trimEnd(),
-      modifier = Modifier.padding(10.dp),
-      fontFamily = FontFamily.Monospace,
-      style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
+    Column(modifier = Modifier.animateContentSize()) {
+      // Header with language tag (if present) and expand/collapse button for long code
+      if (language != null || isCollapsible) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            text = language ?: "",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+          )
+          if (isCollapsible) {
+            Row(
+              modifier = Modifier.clickable { isExpanded = !isExpanded },
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+              Text(
+                text = if (isExpanded) "Collapse" else "${lineCount - COLLAPSE_THRESHOLD_LINES} more lines",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+              )
+              Icon(
+                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+              )
+            }
+          }
+        }
+      }
+
+      // Code content
+      Text(
+        text = displayedCode,
+        modifier = Modifier.padding(10.dp),
+        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+      )
+
+      // Bottom indicator when collapsed
+      if (isCollapsible && !isExpanded) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .background(
+              Brush.verticalGradient(
+                colors = listOf(
+                  Color.Transparent,
+                  MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.9f),
+                )
+              )
+            )
+            .clickable { isExpanded = true },
+          contentAlignment = Alignment.Center,
+        ) {
+          Text(
+            text = "⋯",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
+    }
   }
 }
