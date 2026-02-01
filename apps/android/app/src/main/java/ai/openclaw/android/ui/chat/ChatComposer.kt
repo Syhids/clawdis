@@ -139,11 +139,14 @@ fun ChatComposer(
         AttachmentsStrip(attachments = attachments, onRemoveAttachment = onRemoveAttachment)
       }
 
+      val placeholderText = remember(currentSessionLabel, sessionKey, mainSessionKey) {
+        formatPlaceholder(currentSessionLabel, sessionKey, mainSessionKey)
+      }
       OutlinedTextField(
         value = input,
         onValueChange = { input = it },
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text("Message OpenClaw…") },
+        placeholder = { Text(placeholderText) },
         minLines = 2,
         maxLines = 6,
       )
@@ -282,4 +285,17 @@ private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
       }
     }
   }
+}
+
+/**
+ * Generates a context-aware placeholder for the chat input field.
+ * Shows the current session name to provide visual context of which session will receive the message.
+ */
+private fun formatPlaceholder(displayLabel: String, sessionKey: String, mainSessionKey: String): String {
+  val isMain = sessionKey == mainSessionKey || sessionKey == "main"
+  if (isMain) return "Message OpenClaw…"
+
+  val label = displayLabel.trim().ifEmpty { sessionKey }
+  val shortLabel = if (label.length > 24) label.take(21) + "…" else label
+  return "Message $shortLabel…"
 }
