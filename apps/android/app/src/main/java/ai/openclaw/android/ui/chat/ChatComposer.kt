@@ -32,11 +32,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.chat.ChatSessionEntry
 
@@ -50,6 +54,8 @@ fun ChatComposer(
   pendingRunCount: Int,
   errorText: String?,
   attachments: List<PendingImageAttachment>,
+  inputText: String,
+  onInputChange: (String) -> Unit,
   onPickImages: () -> Unit,
   onRemoveAttachment: (id: String) -> Unit,
   onSetThinkingLevel: (level: String) -> Unit,
@@ -58,7 +64,6 @@ fun ChatComposer(
   onAbort: () -> Unit,
   onSend: (text: String) -> Unit,
 ) {
-  var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
   var showSessionMenu by remember { mutableStateOf(false) }
 
@@ -66,7 +71,7 @@ fun ChatComposer(
   val currentSessionLabel =
     sessionOptions.firstOrNull { it.key == sessionKey }?.displayName ?: sessionKey
 
-  val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
+  val canSend = pendingRunCount == 0 && (inputText.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
 
   Surface(
     shape = MaterialTheme.shapes.large,
@@ -140,9 +145,22 @@ fun ChatComposer(
       }
 
       OutlinedTextField(
-        value = input,
-        onValueChange = { input = it },
-        modifier = Modifier.fillMaxWidth(),
+        value = inputText,
+        onValueChange = onInputChange,
+        modifier = Modifier
+          .fillMaxWidth()
+          .onPreviewKeyEvent { event ->
+            if (event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
+              if (pendingRunCount > 0) {
+                onAbort()
+                true
+              } else {
+                false
+              }
+            } else {
+              false
+            }
+          },
         placeholder = { Text("Message OpenClaw…") },
         minLines = 2,
         maxLines = 6,
@@ -165,8 +183,8 @@ fun ChatComposer(
           }
         } else {
           FilledTonalIconButton(onClick = {
-            val text = input
-            input = ""
+            val text = inputText
+            onInputChange("")
             onSend(text)
           }, enabled = canSend) {
             Icon(Icons.Default.ArrowUpward, contentDescription = "Send")
