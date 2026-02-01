@@ -37,6 +37,16 @@
             android:name=".NodeForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync|microphone|mediaProjection" />
+        <service
+            android:name=".TalkModeTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/talk_mode_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true">
