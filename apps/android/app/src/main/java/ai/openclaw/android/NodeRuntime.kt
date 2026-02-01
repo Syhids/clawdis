@@ -449,6 +449,10 @@ class NodeRuntime(context: Context) {
     prefs.setTalkEnabled(value)
   }
 
+  fun interruptTalkSpeech() {
+    talkMode.interruptSpeech()
+  }
+
   private fun buildInvokeCommands(): List<String> =
     buildList {
       add(OpenClawCanvasCommand.Present.rawValue)

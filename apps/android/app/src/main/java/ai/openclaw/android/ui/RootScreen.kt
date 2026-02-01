@@ -271,6 +271,7 @@ fun RootScreen(viewModel: MainViewModel) {
         statusText = talkStatusText,
         isListening = talkIsListening,
         isSpeaking = talkIsSpeaking,
+        onInterrupt = { viewModel.interruptTalkSpeech() },
       )
     }
   }
