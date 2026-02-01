@@ -14,12 +14,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.MainViewModel
+import ai.openclaw.android.SharedContent
 import ai.openclaw.android.chat.OutgoingAttachment
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +41,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val streamingAssistantText by viewModel.chatStreamingAssistantText.collectAsState()
   val pendingToolCalls by viewModel.chatPendingToolCalls.collectAsState()
   val sessions by viewModel.chatSessions.collectAsState()
+  val sharedContent by viewModel.sharedContent.collectAsState()
 
   LaunchedEffect(mainSessionKey) {
     viewModel.loadChat(mainSessionKey)
@@ -49,6 +53,33 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val scope = rememberCoroutineScope()
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
+  var sharedTextInput by remember { mutableStateOf("") }
+
+  // Handle shared content from share intent
+  LaunchedEffect(sharedContent) {
+    val content = sharedContent ?: return@LaunchedEffect
+    when (content) {
+      is SharedContent.Text -> {
+        sharedTextInput = content.text
+        viewModel.clearSharedContent()
+      }
+      is SharedContent.Images -> {
+        scope.launch(Dispatchers.IO) {
+          val loaded = content.uris.take(8).mapNotNull { uri ->
+            try {
+              loadImageAttachment(resolver, uri)
+            } catch (_: Throwable) {
+              null
+            }
+          }
+          withContext(Dispatchers.Main) {
+            attachments.addAll(loaded)
+            viewModel.clearSharedContent()
+          }
+        }
+      }
+    }
+  }
 
   val pickImages =
     rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -92,6 +123,8 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       errorText = errorText,
       attachments = attachments,
+      initialInputText = sharedTextInput,
+      onInputTextConsumed = { sharedTextInput = "" },
       onPickImages = { pickImages.launch("image/*") },
       onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
       onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
