@@ -1,9 +1,12 @@
 package ai.openclaw.android
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.os.Bundle
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.Parcelable
 import android.view.WindowManager
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
@@ -43,6 +46,9 @@ class MainActivity : ComponentActivity() {
     viewModel.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
     viewModel.screenRecorder.attachPermissionRequester(permissionRequester)
 
+    // Handle share intent
+    handleShareIntent(intent)
+
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         viewModel.preventSleep.collect { enabled ->
@@ -59,6 +65,52 @@ class MainActivity : ComponentActivity() {
       OpenClawTheme {
         Surface(modifier = Modifier) {
           RootScreen(viewModel = viewModel)
+        }
+      }
+    }
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    handleShareIntent(intent)
+  }
+
+  private fun handleShareIntent(intent: Intent?) {
+    if (intent == null) return
+    when (intent.action) {
+      Intent.ACTION_SEND -> {
+        val mimeType = intent.type ?: return
+        when {
+          mimeType.startsWith("image/") -> {
+            val uri = if (Build.VERSION.SDK_INT >= 33) {
+              intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+              @Suppress("DEPRECATION")
+              intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+            if (uri != null) {
+              viewModel.setSharedContent(SharedContent.Images(listOf(uri)))
+            }
+          }
+          mimeType == "text/plain" -> {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+            if (!text.isNullOrBlank()) {
+              viewModel.setSharedContent(SharedContent.Text(text))
+            }
+          }
+        }
+      }
+      Intent.ACTION_SEND_MULTIPLE -> {
+        if (intent.type?.startsWith("image/") == true) {
+          val uris = if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+          } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+          }
+          if (!uris.isNullOrEmpty()) {
+            viewModel.setSharedContent(SharedContent.Images(uris))
+          }
         }
       }
     }

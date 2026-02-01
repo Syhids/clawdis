@@ -8,7 +8,9 @@ import ai.openclaw.android.node.CameraCaptureManager
 import ai.openclaw.android.node.CanvasController
 import ai.openclaw.android.node.ScreenRecordManager
 import ai.openclaw.android.node.SmsManager
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
   private val runtime: NodeRuntime = (app as NodeApp).runtime
@@ -63,6 +65,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val chatPendingToolCalls = runtime.chatPendingToolCalls
   val chatSessions = runtime.chatSessions
   val pendingRunCount: StateFlow<Int> = runtime.pendingRunCount
+
+  // Shared content from share intents
+  private val _sharedContent = MutableStateFlow<SharedContent?>(null)
+  val sharedContent: StateFlow<SharedContent?> = _sharedContent.asStateFlow()
+
+  fun setSharedContent(content: SharedContent?) {
+    _sharedContent.value = content
+  }
+
+  fun clearSharedContent() {
+    _sharedContent.value = null
+  }
 
   fun setForeground(value: Boolean) {
     runtime.setForeground(value)

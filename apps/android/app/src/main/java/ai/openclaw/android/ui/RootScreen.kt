@@ -67,6 +67,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import ai.openclaw.android.CameraHudKind
 import ai.openclaw.android.MainViewModel
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,10 +89,19 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
+  val sharedContent by viewModel.sharedContent.collectAsState()
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
     }
+
+  // Auto-open chat sheet when content is shared to the app
+  LaunchedEffect(sharedContent) {
+    if (sharedContent != null && sheet != Sheet.Chat) {
+      sheet = Sheet.Chat
+    }
+  }
+
   val activity =
     remember(cameraHud, screenRecordActive, isForeground, statusText, voiceWakeStatusText) {
       // Status pill owns transient activity state so it doesn't overlap the connection indicator.

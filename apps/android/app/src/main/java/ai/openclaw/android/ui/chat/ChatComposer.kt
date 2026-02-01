@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,8 @@ fun ChatComposer(
   pendingRunCount: Int,
   errorText: String?,
   attachments: List<PendingImageAttachment>,
+  initialInputText: String = "",
+  onInputTextConsumed: () -> Unit = {},
   onPickImages: () -> Unit,
   onRemoveAttachment: (id: String) -> Unit,
   onSetThinkingLevel: (level: String) -> Unit,
@@ -61,6 +64,14 @@ fun ChatComposer(
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
   var showSessionMenu by remember { mutableStateOf(false) }
+
+  // Apply initial input text from share intent
+  LaunchedEffect(initialInputText) {
+    if (initialInputText.isNotEmpty()) {
+      input = initialInputText
+      onInputTextConsumed()
+    }
+  }
 
   val sessionOptions = resolveSessionChoices(sessionKey, sessions, mainSessionKey = mainSessionKey)
   val currentSessionLabel =
