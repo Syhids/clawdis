@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,7 +67,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import ai.openclaw.android.CameraHudKind
+import ai.openclaw.android.LocalShortcutAction
 import ai.openclaw.android.MainViewModel
+import ai.openclaw.android.ShortcutAction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,10 +91,37 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
+  val shortcutAction = LocalShortcutAction.current
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
     }
+
+  // Handle app shortcuts
+  LaunchedEffect(shortcutAction.value) {
+    when (shortcutAction.value) {
+      ShortcutAction.TALK_MODE -> {
+        val micOk = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+          PackageManager.PERMISSION_GRANTED
+        if (micOk) {
+          viewModel.setTalkEnabled(true)
+        }
+        // If no mic permission, the permission launcher will be triggered by the Talk Mode button
+        shortcutAction.value = ShortcutAction.NONE
+      }
+      ShortcutAction.OPEN_CHAT -> {
+        sheet = Sheet.Chat
+        shortcutAction.value = ShortcutAction.NONE
+      }
+      ShortcutAction.NEW_MESSAGE -> {
+        sheet = Sheet.Chat
+        // The chat sheet will handle focusing the input field
+        shortcutAction.value = ShortcutAction.NONE
+      }
+      ShortcutAction.NONE -> { /* no-op */ }
+    }
+  }
+
   val activity =
     remember(cameraHud, screenRecordActive, isForeground, statusText, voiceWakeStatusText) {
       // Status pill owns transient activity state so it doesn't overlap the connection indicator.

@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">OpenClaw Node</string>
+    <string name="talk_mode_tile_label">Talk Mode</string>
+
+    <!-- App Shortcuts -->
+    <string name="shortcut_talk_mode_short">Talk Mode</string>
+    <string name="shortcut_talk_mode_long">Start Talk Mode</string>
+    <string name="shortcut_chat_short">Open Chat</string>
+    <string name="shortcut_chat_long">Open Chat Panel</string>
+    <string name="shortcut_new_message_short">New Message</string>
+    <string name="shortcut_new_message_long">Send a New Message</string>
 </resources>
