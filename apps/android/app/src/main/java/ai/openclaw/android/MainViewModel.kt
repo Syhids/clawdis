@@ -124,6 +124,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     runtime.setTalkEnabled(enabled)
   }
 
+  fun interruptTalkSpeech() {
+    runtime.interruptTalkSpeech()
+  }
+
   fun refreshGatewayConnection() {
     runtime.refreshGatewayConnection()
   }

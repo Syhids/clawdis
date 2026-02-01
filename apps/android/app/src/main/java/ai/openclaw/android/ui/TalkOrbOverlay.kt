@@ -7,6 +7,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +20,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -32,6 +37,7 @@ fun TalkOrbOverlay(
   statusText: String,
   isListening: Boolean,
   isSpeaking: Boolean,
+  onInterrupt: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
   val transition = rememberInfiniteTransition(label = "talk-orb")
@@ -56,12 +62,28 @@ fun TalkOrbOverlay(
       else -> "Thinking"
     }
 
+  val haptic = LocalHapticFeedback.current
+  val interactionSource = remember { MutableInteractionSource() }
+
   Column(
     modifier = modifier.padding(24.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Box(contentAlignment = Alignment.Center) {
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier = if (isSpeaking && onInterrupt != null) {
+        Modifier.clickable(
+          interactionSource = interactionSource,
+          indication = null, // No ripple - the orb itself is the feedback
+        ) {
+          haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+          onInterrupt()
+        }
+      } else {
+        Modifier
+      },
+    ) {
       Canvas(modifier = Modifier.size(360.dp)) {
         val center = this.center
         val baseRadius = size.minDimension * 0.30f
@@ -123,8 +145,10 @@ fun TalkOrbOverlay(
         )
       }
     } else {
+      // Show hint when speaking that user can tap to interrupt
+      val displayPhase = if (isSpeaking && onInterrupt != null) "$phase (tap to stop)" else phase
       Text(
-        text = phase,
+        text = displayPhase,
         color = Color.White.copy(alpha = 0.80f),
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,

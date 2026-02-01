@@ -755,6 +755,18 @@ class TalkModeManager(
     }
   }
 
+  /**
+   * Interrupt any ongoing speech playback. If Talk Mode is still enabled,
+   * this will also restart listening. Called when user taps the talk orb.
+   */
+  fun interruptSpeech() {
+    if (!_isSpeaking.value) return
+    stopSpeaking(resetInterrupt = true)
+    if (_isEnabled.value) {
+      start()
+    }
+  }
+
   private fun stopSpeaking(resetInterrupt: Boolean = true) {
     pcmStopRequested = true
     if (!_isSpeaking.value) {
