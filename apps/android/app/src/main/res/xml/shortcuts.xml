@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="talk_mode"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_talk"
+        android:shortcutShortLabel="@string/shortcut_talk_mode_short"
+        android:shortcutLongLabel="@string/shortcut_talk_mode_long">
+        <intent
+            android:action="ai.openclaw.android.action.TALK_MODE"
+            android:targetPackage="ai.openclaw.android"
+            android:targetClass="ai.openclaw.android.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_chat"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_chat"
+        android:shortcutShortLabel="@string/shortcut_chat_short"
+        android:shortcutLongLabel="@string/shortcut_chat_long">
+        <intent
+            android:action="ai.openclaw.android.action.OPEN_CHAT"
+            android:targetPackage="ai.openclaw.android"
+            android:targetClass="ai.openclaw.android.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_message"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_message"
+        android:shortcutShortLabel="@string/shortcut_new_message_short"
+        android:shortcutLongLabel="@string/shortcut_new_message_long">
+        <intent
+            android:action="ai.openclaw.android.action.NEW_MESSAGE"
+            android:targetPackage="ai.openclaw.android"
+            android:targetClass="ai.openclaw.android.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>
