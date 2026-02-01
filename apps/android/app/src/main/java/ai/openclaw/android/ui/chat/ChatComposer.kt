@@ -148,8 +148,9 @@ fun ChatComposer(
         maxLines = 6,
       )
 
+      val isMainSession = sessionKey == mainSessionKey || sessionKey == "main"
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        ConnectionPill(sessionLabel = currentSessionLabel, healthOk = healthOk)
+        ConnectionPill(sessionLabel = currentSessionLabel, healthOk = healthOk, isMainSession = isMainSession)
         Spacer(modifier = Modifier.weight(1f))
 
         if (pendingRunCount > 0) {
@@ -186,8 +187,25 @@ fun ChatComposer(
   }
 }
 
+/**
+ * Connection status pill showing session name and connection state.
+ *
+ * The status dot color provides visual feedback:
+ * - Green: Connected to main session
+ * - Blue/Purple: Connected to an alternative session (sub-agent, isolated, etc.)
+ * - Orange: Connecting (regardless of session)
+ *
+ * This helps power users immediately identify when they're messaging a non-main session.
+ */
 @Composable
-private fun ConnectionPill(sessionLabel: String, healthOk: Boolean) {
+private fun ConnectionPill(sessionLabel: String, healthOk: Boolean, isMainSession: Boolean) {
+  // Green for main session, blue/purple for alternative sessions, orange when connecting
+  val dotColor = when {
+    !healthOk -> Color(0xFFF39C12) // Orange - connecting
+    isMainSession -> Color(0xFF2ECC71) // Green - main session
+    else -> Color(0xFF9B59B6) // Purple - alternative session
+  }
+
   Surface(
     shape = RoundedCornerShape(999.dp),
     color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -200,7 +218,7 @@ private fun ConnectionPill(sessionLabel: String, healthOk: Boolean) {
       Surface(
         modifier = Modifier.size(7.dp),
         shape = androidx.compose.foundation.shape.CircleShape,
-        color = if (healthOk) Color(0xFF2ECC71) else Color(0xFFF39C12),
+        color = dotColor,
       ) {}
       Text(sessionLabel, style = MaterialTheme.typography.labelSmall)
       Text(
