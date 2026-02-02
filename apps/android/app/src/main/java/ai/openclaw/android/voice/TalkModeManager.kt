@@ -77,6 +77,9 @@ class TalkModeManager(
   private val _usingFallbackTts = MutableStateFlow(false)
   val usingFallbackTts: StateFlow<Boolean> = _usingFallbackTts
 
+  private val _liveTranscript = MutableStateFlow<String?>(null)
+  val liveTranscript: StateFlow<String?> = _liveTranscript
+
   private var recognizer: SpeechRecognizer? = null
   private var restartJob: Job? = null
   private var stopRequested = false
@@ -199,6 +202,7 @@ class TalkModeManager(
     lastHeardAtMs = null
     _isListening.value = false
     _statusText.value = "Off"
+    _liveTranscript.value = null
     stopSpeaking()
     _usingFallbackTts.value = false
     chatSubscribedSessionKey = null
@@ -266,6 +270,7 @@ class TalkModeManager(
     if (trimmed.isNotEmpty()) {
       lastTranscript = trimmed
       lastHeardAtMs = SystemClock.elapsedRealtime()
+      _liveTranscript.value = trimmed
     }
 
     if (isFinal) {
@@ -300,6 +305,7 @@ class TalkModeManager(
     _statusText.value = "Thinking…"
     lastTranscript = ""
     lastHeardAtMs = null
+    _liveTranscript.value = null
 
     reloadConfig()
     val prompt = buildPrompt(transcript)

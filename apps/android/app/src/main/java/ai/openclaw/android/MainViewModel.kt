@@ -47,6 +47,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val talkStatusText: StateFlow<String> = runtime.talkStatusText
   val talkIsListening: StateFlow<Boolean> = runtime.talkIsListening
   val talkIsSpeaking: StateFlow<Boolean> = runtime.talkIsSpeaking
+  val talkLiveTranscript: StateFlow<String?> = runtime.talkLiveTranscript
   val manualEnabled: StateFlow<Boolean> = runtime.manualEnabled
   val manualHost: StateFlow<String> = runtime.manualHost
   val manualPort: StateFlow<Int> = runtime.manualPort

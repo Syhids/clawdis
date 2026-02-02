@@ -86,6 +86,7 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkStatusText by viewModel.talkStatusText.collectAsState()
   val talkIsListening by viewModel.talkIsListening.collectAsState()
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
+  val talkLiveTranscript by viewModel.talkLiveTranscript.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
   val audioPermissionLauncher =
@@ -271,6 +272,7 @@ fun RootScreen(viewModel: MainViewModel) {
         statusText = talkStatusText,
         isListening = talkIsListening,
         isSpeaking = talkIsSpeaking,
+        liveTranscript = talkLiveTranscript,
       )
     }
   }
