@@ -109,9 +109,18 @@ fun ChatComposer(
         }
 
         Box {
+          val thinkingActive = thinkingLevel.trim().lowercase() !in listOf("off", "")
           FilledTonalButton(
             onClick = { showThinkingMenu = true },
             contentPadding = ButtonDefaults.ContentPadding,
+            colors = if (thinkingActive) {
+              ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+              )
+            } else {
+              ButtonDefaults.filledTonalButtonColors()
+            },
           ) {
             Text("Thinking: ${thinkingLabel(thinkingLevel)}")
           }
