@@ -10,7 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +72,34 @@ class NodeForegroundService : Service() {
         stopSelf()
         return START_NOT_STICKY
       }
+      ACTION_QUICK_REPLY -> {
+        handleQuickReply(intent)
+        return START_STICKY
+      }
     }
     // Keep running; connection is managed by NodeRuntime (auto-reconnect + manual).
     return START_STICKY
+  }
+
+  private fun handleQuickReply(intent: Intent) {
+    val remoteInput = RemoteInput.getResultsFromIntent(intent) ?: return
+    val message = remoteInput.getCharSequence(KEY_QUICK_REPLY_TEXT)?.toString()?.trim()
+    if (message.isNullOrEmpty()) return
+
+    val runtime = (application as NodeApp).runtime
+    if (!runtime.isConnected.value) {
+      scope.launch(Dispatchers.Main) {
+        Toast.makeText(this@NodeForegroundService, "Not connected to gateway", Toast.LENGTH_SHORT).show()
+      }
+      return
+    }
+
+    // Send message to main session
+    runtime.sendChat(message = message, thinking = "", attachments = emptyList())
+
+    scope.launch(Dispatchers.Main) {
+      Toast.makeText(this@NodeForegroundService, "Sent: $message", Toast.LENGTH_SHORT).show()
+    }
   }
 
   override fun onDestroy() {
@@ -118,6 +145,27 @@ class NodeForegroundService : Service() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
       )
 
+    // Quick Reply action with RemoteInput
+    val replyIntent = Intent(this, NodeForegroundService::class.java).setAction(ACTION_QUICK_REPLY)
+    val replyPending =
+      PendingIntent.getService(
+        this,
+        3,
+        replyIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+      )
+    val remoteInput = RemoteInput.Builder(KEY_QUICK_REPLY_TEXT)
+      .setLabel("Message OpenClaw…")
+      .build()
+    val replyAction = NotificationCompat.Action.Builder(
+      R.drawable.ic_reply,
+      "Reply",
+      replyPending,
+    )
+      .addRemoteInput(remoteInput)
+      .setAllowGeneratedReplies(false)
+      .build()
+
     return NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(title)
@@ -126,6 +174,7 @@ class NodeForegroundService : Service() {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+      .addAction(replyAction)
       .addAction(0, "Disconnect", stopPending)
       .build()
   }
@@ -164,6 +213,8 @@ class NodeForegroundService : Service() {
     private const val NOTIFICATION_ID = 1
 
     private const val ACTION_STOP = "ai.openclaw.android.action.STOP"
+    private const val ACTION_QUICK_REPLY = "ai.openclaw.android.action.QUICK_REPLY"
+    private const val KEY_QUICK_REPLY_TEXT = "quick_reply_text"
 
     fun start(context: Context) {
       val intent = Intent(context, NodeForegroundService::class.java)
