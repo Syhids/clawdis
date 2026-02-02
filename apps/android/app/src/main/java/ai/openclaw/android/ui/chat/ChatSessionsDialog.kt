@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,15 @@ fun ChatSessionsDialog(
   onRefresh: () -> Unit,
   onSelect: (sessionKey: String) -> Unit,
 ) {
+  // Sort sessions by recent activity: current session first, then by updatedAtMs descending.
+  // Sessions without a timestamp go to the end.
+  val sortedSessions = remember(sessions, currentSessionKey) {
+    sessions.sortedWith(
+      compareBy<ChatSessionEntry> { it.key != currentSessionKey }
+        .thenByDescending { it.updatedAtMs ?: 0L }
+    )
+  }
+
   AlertDialog(
     onDismissRequest = onDismiss,
     confirmButton = {},
@@ -43,11 +53,11 @@ fun ChatSessionsDialog(
       }
     },
     text = {
-      if (sessions.isEmpty()) {
+      if (sortedSessions.isEmpty()) {
         Text("No sessions", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
       } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          items(sessions, key = { it.key }) { entry ->
+          items(sortedSessions, key = { it.key }) { entry ->
             SessionRow(
               entry = entry,
               isCurrent = entry.key == currentSessionKey,
