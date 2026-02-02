@@ -7,6 +7,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,17 +25,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TalkOrbOverlay(
   seamColor: Color,
   statusText: String,
   isListening: Boolean,
   isSpeaking: Boolean,
+  onDisable: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
+  val haptic = LocalHapticFeedback.current
   val transition = rememberInfiniteTransition(label = "talk-orb")
   val t by
     transition.animateFloat(
@@ -61,7 +68,18 @@ fun TalkOrbOverlay(
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Box(contentAlignment = Alignment.Center) {
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier = Modifier.combinedClickable(
+        onClick = { /* Reserved for future tap actions */ },
+        onLongClick = {
+          if (onDisable != null) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onDisable()
+          }
+        },
+      ),
+    ) {
       Canvas(modifier = Modifier.size(360.dp)) {
         val center = this.center
         val baseRadius = size.minDimension * 0.30f
@@ -128,6 +146,15 @@ fun TalkOrbOverlay(
         color = Color.White.copy(alpha = 0.80f),
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
+      )
+    }
+
+    // Hint for long-press to exit
+    if (onDisable != null) {
+      Text(
+        text = "Hold to exit",
+        color = Color.White.copy(alpha = 0.45f),
+        style = MaterialTheme.typography.labelSmall,
       )
     }
   }
