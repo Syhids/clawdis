@@ -2,9 +2,12 @@ package ai.openclaw.android.ui
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +35,7 @@ fun TalkOrbOverlay(
   statusText: String,
   isListening: Boolean,
   isSpeaking: Boolean,
+  rmsLevel: Float = 0f,
   modifier: Modifier = Modifier,
 ) {
   val transition = rememberInfiniteTransition(label = "talk-orb")
@@ -46,6 +50,16 @@ fun TalkOrbOverlay(
         ),
       label = "pulse",
     )
+
+  // Animate the RMS level with a spring for smooth transitions
+  val animatedRms by animateFloatAsState(
+    targetValue = if (isListening) rmsLevel else 0f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioMediumBouncy,
+      stiffness = Spring.StiffnessLow,
+    ),
+    label = "rms",
+  )
 
   val trimmed = statusText.trim()
   val showStatus = trimmed.isNotEmpty() && trimmed != "Off"
@@ -66,6 +80,19 @@ fun TalkOrbOverlay(
         val center = this.center
         val baseRadius = size.minDimension * 0.30f
 
+        // RMS-reactive ring (innermost, visible when listening and detecting audio)
+        if (isListening && animatedRms > 0.05f) {
+          val rmsRingScale = 1.0f + (animatedRms * 0.15f)
+          val rmsAlpha = (animatedRms * 0.6f).coerceIn(0.1f, 0.5f)
+          val strokeWidth = (2f + animatedRms * 4f).dp
+          drawCircle(
+            color = seamColor.copy(alpha = rmsAlpha),
+            radius = baseRadius * rmsRingScale,
+            center = center,
+            style = Stroke(width = strokeWidth.toPx()),
+          )
+        }
+
         val ring1 = 1.05f + (t * 0.25f)
         val ring2 = 1.20f + (t * 0.55f)
         val ringAlpha1 = (1f - t) * 0.34f
@@ -84,6 +111,8 @@ fun TalkOrbOverlay(
           style = Stroke(width = 3.dp.toPx()),
         )
 
+        // Main orb with RMS-reactive size when listening
+        val orbScale = if (isListening) 1.0f + (animatedRms * 0.08f) else 1.0f
         drawCircle(
           brush =
             Brush.radialGradient(
@@ -94,15 +123,15 @@ fun TalkOrbOverlay(
                   Color.Black.copy(alpha = 0.56f),
                 ),
               center = center,
-              radius = baseRadius * 1.35f,
+              radius = baseRadius * orbScale * 1.35f,
             ),
-          radius = baseRadius,
+          radius = baseRadius * orbScale,
           center = center,
         )
 
         drawCircle(
           color = seamColor.copy(alpha = 0.34f),
-          radius = baseRadius,
+          radius = baseRadius * orbScale,
           center = center,
           style = Stroke(width = 1.dp.toPx()),
         )
