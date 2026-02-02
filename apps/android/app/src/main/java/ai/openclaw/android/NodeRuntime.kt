@@ -107,6 +107,9 @@ class NodeRuntime(context: Context) {
   val talkIsSpeaking: StateFlow<Boolean>
     get() = talkMode.isSpeaking
 
+  val talkRmsLevel: StateFlow<Float>
+    get() = talkMode.rmsLevel
+
   private val discovery = GatewayDiscovery(appContext, scope = scope)
   val gateways: StateFlow<List<GatewayEndpoint>> = discovery.gateways
   val discoveryStatusText: StateFlow<String> = discovery.statusText

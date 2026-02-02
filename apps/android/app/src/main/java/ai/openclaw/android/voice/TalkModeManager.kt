@@ -77,6 +77,9 @@ class TalkModeManager(
   private val _usingFallbackTts = MutableStateFlow(false)
   val usingFallbackTts: StateFlow<Boolean> = _usingFallbackTts
 
+  private val _rmsLevel = MutableStateFlow(0f)
+  val rmsLevel: StateFlow<Float> = _rmsLevel
+
   private var recognizer: SpeechRecognizer? = null
   private var restartJob: Job? = null
   private var stopRequested = false
@@ -199,6 +202,7 @@ class TalkModeManager(
     lastHeardAtMs = null
     _isListening.value = false
     _statusText.value = "Off"
+    _rmsLevel.value = 0f
     stopSpeaking()
     _usingFallbackTts.value = false
     chatSubscribedSessionKey = null
@@ -1190,7 +1194,12 @@ class TalkModeManager(
 
       override fun onBeginningOfSpeech() {}
 
-      override fun onRmsChanged(rmsdB: Float) {}
+      override fun onRmsChanged(rmsdB: Float) {
+        // Normalize RMS from typical range (-2 to 10 dB) to 0-1
+        // Android's SpeechRecognizer reports RMS in dB, with higher values meaning louder
+        val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+        _rmsLevel.value = normalized
+      }
 
       override fun onBufferReceived(buffer: ByteArray?) {}
 
