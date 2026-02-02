@@ -92,6 +92,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       errorText = errorText,
       attachments = attachments,
+      requestFocus = true,
       onPickImages = { pickImages.launch("image/*") },
       onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
       onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
