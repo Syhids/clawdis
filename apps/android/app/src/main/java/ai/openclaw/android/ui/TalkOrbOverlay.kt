@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,7 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -32,6 +37,7 @@ fun TalkOrbOverlay(
   statusText: String,
   isListening: Boolean,
   isSpeaking: Boolean,
+  liveTranscript: String? = null,
   modifier: Modifier = Modifier,
 ) {
   val transition = rememberInfiniteTransition(label = "talk-orb")
@@ -55,6 +61,8 @@ fun TalkOrbOverlay(
       isListening -> "Listening"
       else -> "Thinking"
     }
+
+  val transcriptText = liveTranscript?.trim()?.takeIf { it.isNotEmpty() && isListening }
 
   Column(
     modifier = modifier.padding(24.dp),
@@ -104,7 +112,6 @@ fun TalkOrbOverlay(
           color = seamColor.copy(alpha = 0.34f),
           radius = baseRadius,
           center = center,
-          style = Stroke(width = 1.dp.toPx()),
         )
       }
     }
@@ -129,6 +136,27 @@ fun TalkOrbOverlay(
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
       )
+    }
+
+    // Live transcript preview while listening
+    if (transcriptText != null) {
+      Surface(
+        color = Color.Black.copy(alpha = 0.50f),
+        shape = RoundedCornerShape(12.dp),
+      ) {
+        Text(
+          text = "\"$transcriptText\"",
+          modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .widthIn(max = 280.dp),
+          color = Color.White.copy(alpha = 0.85f),
+          style = MaterialTheme.typography.bodyMedium,
+          fontStyle = FontStyle.Italic,
+          textAlign = TextAlign.Center,
+          maxLines = 3,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
   }
 }
