@@ -81,11 +81,17 @@ fun ChatComposer(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Box {
+          val sessionCount = sessionOptions.size
+          val sessionButtonText = if (sessionCount > 1) {
+            "Session: $currentSessionLabel ($sessionCount)"
+          } else {
+            "Session: $currentSessionLabel"
+          }
           FilledTonalButton(
             onClick = { showSessionMenu = true },
             contentPadding = ButtonDefaults.ContentPadding,
           ) {
-            Text("Session: $currentSessionLabel")
+            Text(sessionButtonText)
           }
 
           DropdownMenu(expanded = showSessionMenu, onDismissRequest = { showSessionMenu = false }) {
