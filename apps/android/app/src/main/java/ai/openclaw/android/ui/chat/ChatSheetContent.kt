@@ -114,6 +114,19 @@ fun ChatSheetContent(viewModel: MainViewModel) {
         viewModel.sendChat(message = text, thinking = thinkingLevel, attachments = outgoing)
         attachments.clear()
       },
+      onSendWithThinking = { text, thinking ->
+        val outgoing =
+          attachments.map { att ->
+            OutgoingAttachment(
+              type = "image",
+              mimeType = att.mimeType,
+              fileName = att.fileName,
+              base64 = att.base64,
+            )
+          }
+        viewModel.sendChat(message = text, thinking = thinking, attachments = outgoing)
+        attachments.clear()
+      },
     )
   }
 }

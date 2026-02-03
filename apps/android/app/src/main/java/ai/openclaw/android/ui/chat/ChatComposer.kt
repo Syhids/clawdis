@@ -37,6 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.chat.ChatSessionEntry
 
@@ -57,6 +64,7 @@ fun ChatComposer(
   onRefresh: () -> Unit,
   onAbort: () -> Unit,
   onSend: (text: String) -> Unit,
+  onSendWithThinking: ((text: String, thinking: String) -> Unit)? = null,
 ) {
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
@@ -142,7 +150,34 @@ fun ChatComposer(
       OutlinedTextField(
         value = input,
         onValueChange = { input = it },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+          .fillMaxWidth()
+          .onPreviewKeyEvent { event ->
+            // Only handle key down events to avoid double-firing
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            
+            when {
+              // Ctrl+Shift+Enter: Send with high thinking
+              event.key == Key.Enter && event.isCtrlPressed && event.isShiftPressed -> {
+                if (canSend && onSendWithThinking != null) {
+                  val text = input
+                  input = ""
+                  onSendWithThinking(text, "high")
+                  true
+                } else false
+              }
+              // Ctrl+Enter: Send with current thinking level
+              event.key == Key.Enter && event.isCtrlPressed && !event.isShiftPressed -> {
+                if (canSend) {
+                  val text = input
+                  input = ""
+                  onSend(text)
+                  true
+                } else false
+              }
+              else -> false
+            }
+          },
         placeholder = { Text("Message OpenClaw…") },
         minLines = 2,
         maxLines = 6,
