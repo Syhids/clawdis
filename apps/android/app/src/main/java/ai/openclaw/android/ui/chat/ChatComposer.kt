@@ -249,16 +249,33 @@ private fun AttachmentsStrip(
   attachments: List<PendingImageAttachment>,
   onRemoveAttachment: (id: String) -> Unit,
 ) {
-  Row(
-    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-  ) {
-    for (att in attachments) {
-      AttachmentChip(
-        fileName = att.fileName,
-        onRemove = { onRemoveAttachment(att.id) },
-      )
+  // Calculate total size from base64 (base64 is ~4/3 of original size)
+  val totalBytes = remember(attachments) {
+    attachments.sumOf { att -> (att.base64.length * 3L) / 4L }
+  }
+
+  Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(
+      modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      for (att in attachments) {
+        AttachmentChip(
+          fileName = att.fileName,
+          onRemove = { onRemoveAttachment(att.id) },
+        )
+      }
     }
+
+    // Size indicator
+    val sizeText = formatBytes(totalBytes)
+    val countText = if (attachments.size == 1) "1 attachment" else "${attachments.size} attachments"
+    Text(
+      text = "$countText · $sizeText",
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(start = 4.dp),
+    )
   }
 }
 
@@ -281,5 +298,13 @@ private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
         Text("×")
       }
     }
+  }
+}
+
+private fun formatBytes(bytes: Long): String {
+  return when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
+    else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
   }
 }
