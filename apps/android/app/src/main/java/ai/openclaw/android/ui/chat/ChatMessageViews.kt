@@ -86,7 +86,13 @@ private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color)
 }
 
 @Composable
-fun ChatTypingIndicatorBubble() {
+fun ChatTypingIndicatorBubble(thinkingLevel: String = "off") {
+  val displayText = when (thinkingLevel.trim().lowercase()) {
+    "low" -> "Thinking (low)…"
+    "medium" -> "Thinking (medium)…"
+    "high" -> "Thinking (high)…"
+    else -> "Thinking…"
+  }
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
     Surface(
       shape = RoundedCornerShape(16.dp),
@@ -98,7 +104,7 @@ fun ChatTypingIndicatorBubble() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         DotPulse()
-        Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(displayText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
   }
