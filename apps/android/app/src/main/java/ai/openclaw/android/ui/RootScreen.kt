@@ -15,6 +15,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.webkit.WebSettingsCompat
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -37,6 +39,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ScreenShare
@@ -72,6 +76,7 @@ import ai.openclaw.android.MainViewModel
 @Composable
 fun RootScreen(viewModel: MainViewModel) {
   var sheet by remember { mutableStateOf<Sheet?>(null) }
+  var showExitConfirmation by remember { mutableStateOf(false) }
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val safeOverlayInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
   val context = LocalContext.current
@@ -88,6 +93,9 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
+  val pendingRunCount by viewModel.pendingRunCount.collectAsState()
+  val pendingToolCalls by viewModel.chatPendingToolCalls.collectAsState()
+  val hasPendingOperations = pendingRunCount > 0 || pendingToolCalls.isNotEmpty()
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
@@ -286,6 +294,41 @@ fun RootScreen(viewModel: MainViewModel) {
         Sheet.Settings -> SettingsSheet(viewModel = viewModel)
       }
     }
+  }
+
+  // Intercept back press when there are pending operations
+  BackHandler(enabled = hasPendingOperations) {
+    showExitConfirmation = true
+  }
+
+  // Exit confirmation dialog
+  if (showExitConfirmation) {
+    val toolCount = pendingToolCalls.size
+    val description = when {
+      pendingRunCount > 0 && toolCount > 0 -> "$pendingRunCount run${if (pendingRunCount > 1) "s" else ""} and $toolCount tool${if (toolCount > 1) "s" else ""}"
+      pendingRunCount > 0 -> "$pendingRunCount run${if (pendingRunCount > 1) "s" else ""}"
+      toolCount > 0 -> "$toolCount tool${if (toolCount > 1) "s" else ""}"
+      else -> "operations"
+    }
+    AlertDialog(
+      onDismissRequest = { showExitConfirmation = false },
+      title = { Text("Exit OpenClaw?") },
+      text = { Text("There are $description still running. Closing the app may interrupt them.") },
+      confirmButton = {
+        TextButton(onClick = {
+          showExitConfirmation = false
+          // Let the system handle the back press by exiting
+          (context as? android.app.Activity)?.finish()
+        }) {
+          Text("Exit anyway")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showExitConfirmation = false }) {
+          Text("Stay")
+        }
+      },
+    )
   }
 }
 
