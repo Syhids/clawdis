@@ -2,7 +2,9 @@ package ai.openclaw.android.ui.chat
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import ai.openclaw.android.chat.ChatMessage
@@ -104,6 +107,8 @@ fun ChatTypingIndicatorBubble() {
   }
 }
 
+private const val TOOLS_COLLAPSE_THRESHOLD = 6
+
 @Composable
 fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
   val context = LocalContext.current
@@ -111,14 +116,24 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
     remember(toolCalls, context) {
       toolCalls.map { ToolDisplayRegistry.resolve(context, it.name, it.args) }
     }
+  var expanded by remember { mutableStateOf(false) }
+  val hasOverflow = toolCalls.size > TOOLS_COLLAPSE_THRESHOLD
+  val visibleDisplays = if (expanded || !hasOverflow) displays else displays.take(TOOLS_COLLAPSE_THRESHOLD)
+  val hiddenCount = toolCalls.size - TOOLS_COLLAPSE_THRESHOLD
+
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
     Surface(
       shape = RoundedCornerShape(16.dp),
       color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-      Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Column(
+        modifier = Modifier
+          .padding(horizontal = 12.dp, vertical = 10.dp)
+          .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
         Text("Running tools…", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-        for (display in displays.take(6)) {
+        for (display in visibleDisplays) {
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
               "${display.emoji} ${display.label}",
@@ -136,11 +151,14 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
             }
           }
         }
-        if (toolCalls.size > 6) {
+        if (hasOverflow) {
           Text(
-            "… +${toolCalls.size - 6} more",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = if (expanded) "Show less" else "+$hiddenCount more",
+            style = MaterialTheme.typography.bodySmall.copy(
+              textDecoration = TextDecoration.Underline,
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { expanded = !expanded },
           )
         }
       }
