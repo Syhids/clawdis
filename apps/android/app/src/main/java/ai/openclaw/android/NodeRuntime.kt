@@ -56,6 +56,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import android.util.Log
 import java.util.concurrent.atomic.AtomicLong
 
 class NodeRuntime(context: Context) {
@@ -157,6 +158,7 @@ class NodeRuntime(context: Context) {
       identityStore = identityStore,
       deviceAuthStore = deviceAuthStore,
       onConnected = { name, remote, mainSessionKey ->
+        Log.d("OpenClawNode", "operator connected: server=$name remote=$remote mainSessionKey=$mainSessionKey")
         operatorConnected = true
         operatorStatusText = "Connected"
         _serverName.value = name
@@ -168,6 +170,7 @@ class NodeRuntime(context: Context) {
         scope.launch { refreshWakeWordsFromGateway() }
       },
       onDisconnected = { message ->
+        Log.d("OpenClawNode", "operator disconnected: $message")
         operatorConnected = false
         operatorStatusText = message
         _serverName.value = null
@@ -193,12 +196,14 @@ class NodeRuntime(context: Context) {
       identityStore = identityStore,
       deviceAuthStore = deviceAuthStore,
       onConnected = { _, _, _ ->
+        Log.d("OpenClawNode", "node session connected")
         nodeConnected = true
         nodeStatusText = "Connected"
         updateStatus()
         maybeNavigateToA2uiOnConnect()
       },
       onDisconnected = { message ->
+        Log.d("OpenClawNode", "node session disconnected: $message")
         nodeConnected = false
         nodeStatusText = message
         updateStatus()
@@ -242,14 +247,15 @@ class NodeRuntime(context: Context) {
 
   private fun updateStatus() {
     _isConnected.value = operatorConnected
-    _statusText.value =
-      when {
+    val newStatus = when {
         operatorConnected && nodeConnected -> "Connected"
         operatorConnected && !nodeConnected -> "Connected (node offline)"
         !operatorConnected && nodeConnected -> "Connected (operator offline)"
         operatorStatusText.isNotBlank() && operatorStatusText != "Offline" -> operatorStatusText
         else -> nodeStatusText
       }
+    Log.d("OpenClawNode", "updateStatus: operator=$operatorConnected node=$nodeConnected → $newStatus")
+    _statusText.value = newStatus
   }
 
   private fun resolveMainSessionKey(): String {
@@ -357,8 +363,11 @@ class NodeRuntime(context: Context) {
           val host = manualHost.value.trim()
           val port = manualPort.value
           if (host.isNotEmpty() && port in 1..65535) {
+            Log.d("OpenClawNode", "auto-connect: manual endpoint $host:$port")
             didAutoConnect = true
             connect(GatewayEndpoint.manual(host = host, port = port))
+          } else {
+            Log.d("OpenClawNode", "auto-connect: manual enabled but invalid host=$host port=$port")
           }
           return@collect
         }
@@ -366,6 +375,7 @@ class NodeRuntime(context: Context) {
         val targetStableId = lastDiscoveredStableId.value.trim()
         if (targetStableId.isEmpty()) return@collect
         val target = list.firstOrNull { it.stableId == targetStableId } ?: return@collect
+        Log.d("OpenClawNode", "auto-connect: discovered gateway ${target.name} (${target.host}:${target.port})")
         didAutoConnect = true
         connect(target)
       }
@@ -558,6 +568,8 @@ class NodeRuntime(context: Context) {
   }
 
   fun connect(endpoint: GatewayEndpoint) {
+    Log.d("OpenClawNode", "connect: ${endpoint.name} (${endpoint.host}:${endpoint.port}) " +
+      "tls=${endpoint.tlsEnabled} tailnet=${endpoint.tailnetDns} lan=${endpoint.lanHost}")
     connectedEndpoint = endpoint
     operatorStatusText = "Connecting…"
     nodeStatusText = "Connecting…"
@@ -617,6 +629,8 @@ class NodeRuntime(context: Context) {
     val stored = prefs.loadGatewayTlsFingerprint(endpoint.stableId)
     val hinted = endpoint.tlsEnabled || !endpoint.tlsFingerprintSha256.isNullOrBlank()
     val manual = endpoint.stableId.startsWith("manual|")
+    Log.d("OpenClawNode", "resolveTls: stableId=${endpoint.stableId} manual=$manual hinted=$hinted " +
+      "stored=${stored?.take(16)} manualTls=${manualTls.value}")
 
     if (manual) {
       if (!manualTls.value) return null

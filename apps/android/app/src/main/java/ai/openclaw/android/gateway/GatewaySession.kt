@@ -193,11 +193,14 @@ class GatewaySession(
     suspend fun connect() {
       val scheme = if (tls != null) "wss" else "ws"
       val url = "$scheme://${endpoint.host}:${endpoint.port}"
+      Log.d(loggerTag, "WS opening: $url (tls=${tls != null})")
       val request = Request.Builder().url(url).build()
       socket = client.newWebSocket(request, Listener())
       try {
         connectDeferred.await()
+        Log.d(loggerTag, "WS connect deferred resolved — handshake complete")
       } catch (err: Throwable) {
+        Log.e(loggerTag, "WS connect failed: ${err::class.java.simpleName}: ${err.message}")
         throw err
       }
     }
@@ -224,8 +227,11 @@ class GatewaySession(
 
     suspend fun sendJson(obj: JsonObject) {
       val jsonString = obj.toString()
+      val preview = if (jsonString.length > 200) jsonString.take(200) + "…" else jsonString
+      Log.d(loggerTag, "WS → $preview")
       writeLock.withLock {
-        socket?.send(jsonString)
+        val sent = socket?.send(jsonString) ?: false
+        if (!sent) Log.w(loggerTag, "WS send returned false (socket closed?)")
       }
     }
 
@@ -253,11 +259,14 @@ class GatewaySession(
 
     private inner class Listener : WebSocketListener() {
       override fun onOpen(webSocket: WebSocket, response: Response) {
+        Log.d(loggerTag, "WS onOpen: HTTP ${response.code} ${response.message}")
         scope.launch {
           try {
             val nonce = awaitConnectNonce()
+            Log.d(loggerTag, "WS connect nonce received: ${nonce?.take(8) ?: "(null)"}")
             sendConnect(nonce)
           } catch (err: Throwable) {
+            Log.e(loggerTag, "WS sendConnect failed: ${err::class.java.simpleName}: ${err.message}")
             connectDeferred.completeExceptionally(err)
             closeQuietly()
           }
@@ -265,10 +274,13 @@ class GatewaySession(
       }
 
       override fun onMessage(webSocket: WebSocket, text: String) {
+        val preview = if (text.length > 200) text.take(200) + "…" else text
+        Log.d(loggerTag, "WS ← $preview")
         scope.launch { handleMessage(text) }
       }
 
       override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+        Log.e(loggerTag, "WS onFailure: ${t::class.java.simpleName}: ${t.message} (response=${response?.code})")
         if (!connectDeferred.isCompleted) {
           connectDeferred.completeExceptionally(t)
         }
@@ -280,6 +292,7 @@ class GatewaySession(
       }
 
       override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+        Log.d(loggerTag, "WS onClosed: code=$code reason=$reason")
         if (!connectDeferred.isCompleted) {
           connectDeferred.completeExceptionally(IllegalStateException("Gateway closed: $reason"))
         }
@@ -297,10 +310,16 @@ class GatewaySession(
       val trimmedToken = token?.trim().orEmpty()
       val authToken = if (storedToken.isNullOrBlank()) trimmedToken else storedToken
       val canFallbackToShared = !storedToken.isNullOrBlank() && trimmedToken.isNotBlank()
+      Log.d(loggerTag, "sendConnect: role=${options.role} deviceId=${identity.deviceId.take(12)}… " +
+        "hasStoredToken=${!storedToken.isNullOrBlank()} hasSharedToken=${trimmedToken.isNotBlank()} " +
+        "authTokenLen=${authToken.length} hasPassword=${!password.isNullOrBlank()}")
       val payload = buildConnectParams(identity, connectNonce, authToken, password?.trim())
+      Log.d(loggerTag, "sendConnect: sending connect request (role=${options.role})…")
       val res = request("connect", payload, timeoutMs = 8_000)
+      Log.d(loggerTag, "sendConnect: response ok=${res.ok} error=${res.error?.code}:${res.error?.message}")
       if (!res.ok) {
         val msg = res.error?.message ?: "connect failed"
+        Log.e(loggerTag, "sendConnect: FAILED — $msg (canFallback=$canFallbackToShared)")
         if (canFallbackToShared) {
           deviceAuthStore.clearToken(identity.deviceId, options.role)
         }
@@ -557,13 +576,18 @@ class GatewaySession(
       }
 
       try {
+        val label = if (attempt == 0) "Connecting" else "Reconnecting (attempt $attempt)"
+        Log.d("OpenClawGateway", "runLoop: $label to ${target.endpoint.host}:${target.endpoint.port}")
         onDisconnected(if (attempt == 0) "Connecting…" else "Reconnecting…")
         connectOnce(target)
+        Log.d("OpenClawGateway", "runLoop: connectOnce returned (connection closed normally)")
         attempt = 0
       } catch (err: Throwable) {
         attempt += 1
+        Log.e("OpenClawGateway", "runLoop: attempt $attempt failed: ${err::class.java.simpleName}: ${err.message}")
         onDisconnected("Gateway error: ${err.message ?: err::class.java.simpleName}")
         val sleepMs = minOf(8_000L, (350.0 * Math.pow(1.7, attempt.toDouble())).toLong())
+        Log.d("OpenClawGateway", "runLoop: sleeping ${sleepMs}ms before retry")
         delay(sleepMs)
       }
     }

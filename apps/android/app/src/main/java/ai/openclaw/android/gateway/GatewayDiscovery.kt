@@ -71,18 +71,28 @@ class GatewayDiscovery(
 
   private val discoveryListener =
     object : NsdManager.DiscoveryListener {
-      override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
-      override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
-      override fun onDiscoveryStarted(serviceType: String) {}
-      override fun onDiscoveryStopped(serviceType: String) {}
+      override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+        Log.w(logTag, "mDNS discovery start FAILED: errorCode=$errorCode serviceType=$serviceType")
+      }
+      override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
+        Log.w(logTag, "mDNS discovery stop FAILED: errorCode=$errorCode")
+      }
+      override fun onDiscoveryStarted(serviceType: String) {
+        Log.d(logTag, "mDNS discovery started for $serviceType")
+      }
+      override fun onDiscoveryStopped(serviceType: String) {
+        Log.d(logTag, "mDNS discovery stopped for $serviceType")
+      }
 
       override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+        Log.d(logTag, "mDNS service found: name=${serviceInfo.serviceName} type=${serviceInfo.serviceType}")
         if (serviceInfo.serviceType != this@GatewayDiscovery.serviceType) return
         resolve(serviceInfo)
       }
 
       override fun onServiceLost(serviceInfo: NsdServiceInfo) {
         val serviceName = BonjourEscapes.decode(serviceInfo.serviceName)
+        Log.d(logTag, "mDNS service lost: $serviceName")
         val id = stableId(serviceName, "local.")
         localById.remove(id)
         publish()
@@ -130,7 +140,9 @@ class GatewayDiscovery(
     nsd.resolveService(
       serviceInfo,
       object : NsdManager.ResolveListener {
-        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+          Log.w(logTag, "mDNS resolve FAILED: name=${serviceInfo.serviceName} errorCode=$errorCode")
+        }
 
       override fun onServiceResolved(resolved: NsdServiceInfo) {
         val host = resolved.host?.hostAddress ?: return
@@ -139,6 +151,7 @@ class GatewayDiscovery(
 
         val rawServiceName = resolved.serviceName
         val serviceName = BonjourEscapes.decode(rawServiceName)
+        Log.d(logTag, "mDNS resolved: $serviceName → $host:$port")
         val displayName = BonjourEscapes.decode(txt(resolved, "displayName") ?: serviceName)
         val lanHost = txt(resolved, "lanHost")
         val tailnetDns = txt(resolved, "tailnetDns")
