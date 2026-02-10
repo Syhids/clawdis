@@ -123,6 +123,11 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
   implementation("androidx.security:security-crypto:1.1.0")
+
+  // BouncyCastle for Ed25519 key generation in software
+  // (Android's built-in BC doesn't support Ed25519 KeyPairGenerator,
+  //  and AndroidKeyStore's Ed25519 doesn't allow key export)
+  implementation("org.bouncycastle:bcprov-jdk18on:1.80")
   implementation("androidx.exifinterface:exifinterface:1.4.2")
   implementation("com.squareup.okhttp3:okhttp:5.3.2")
   implementation("org.bouncycastle:bcprov-jdk18on:1.83")

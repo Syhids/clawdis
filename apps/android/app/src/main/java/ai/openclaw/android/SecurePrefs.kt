@@ -162,7 +162,20 @@ class SecurePrefs(context: Context) {
     if (manual.isNotEmpty()) return manual
     val key = "gateway.token.${_instanceId.value}"
     val stored = prefs.getString(key, null)?.trim()
-    return stored?.takeIf { it.isNotEmpty() }
+    if (!stored.isNullOrEmpty()) return stored
+    // Fallback: read from file (for ADB/debug injection)
+    try {
+      val file = java.io.File(appContext.filesDir, "openclaw/gateway_token.txt")
+      if (file.exists()) {
+        val token = file.readText().trim()
+        if (token.isNotEmpty()) {
+          saveGatewayToken(token)
+          file.delete()
+          return token
+        }
+      }
+    } catch (_: Throwable) {}
+    return null
   }
 
   fun saveGatewayToken(token: String) {
