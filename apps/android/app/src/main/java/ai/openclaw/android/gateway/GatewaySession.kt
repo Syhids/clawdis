@@ -192,8 +192,13 @@ class GatewaySession(
 
     suspend fun connect() {
       val scheme = if (tls != null) "wss" else "ws"
+      val httpScheme = if (tls != null) "https" else "http"
       val url = "$scheme://${endpoint.host}:${endpoint.port}"
-      val request = Request.Builder().url(url).build()
+      val origin = "$httpScheme://${endpoint.host}:${endpoint.port}"
+      val request = Request.Builder()
+        .url(url)
+        .addHeader("Origin", origin)
+        .build()
       socket = client.newWebSocket(request, Listener())
       try {
         connectDeferred.await()
@@ -240,7 +245,17 @@ class GatewaySession(
     }
 
     private fun buildClient(): OkHttpClient {
+      val httpScheme = if (tls != null) "https" else "http"
+      val origin = "$httpScheme://${endpoint.host}:${endpoint.port}"
       val builder = OkHttpClient.Builder()
+        .addNetworkInterceptor { chain ->
+          val req = chain.request()
+          if (req.header("Origin") == null) {
+            chain.proceed(req.newBuilder().addHeader("Origin", origin).build())
+          } else {
+            chain.proceed(req)
+          }
+        }
       val tlsConfig = buildGatewayTlsConfig(tls) { fingerprint ->
         onTlsFingerprint?.invoke(tls?.stableId ?: endpoint.stableId, fingerprint)
       }
@@ -253,11 +268,14 @@ class GatewaySession(
 
     private inner class Listener : WebSocketListener() {
       override fun onOpen(webSocket: WebSocket, response: Response) {
+        Log.d(loggerTag, "WS onOpen: ${response.message}")
         scope.launch {
           try {
             val nonce = awaitConnectNonce()
+            Log.d(loggerTag, "WS connect nonce received: ${nonce?.take(8)}")
             sendConnect(nonce)
           } catch (err: Throwable) {
+            Log.e(loggerTag, "WS sendConnect failed: ${err::class.java.simpleName}: ${err.message}", err)
             connectDeferred.completeExceptionally(err)
             closeQuietly()
           }
@@ -292,13 +310,31 @@ class GatewaySession(
     }
 
     private suspend fun sendConnect(connectNonce: String?) {
-      val identity = identityStore.loadOrCreate()
+      Log.d(loggerTag, "sendConnect: start nonce=${connectNonce?.take(8)}")
+      val identity = try {
+        identityStore.loadOrCreate()
+      } catch (err: Throwable) {
+        Log.e(loggerTag, "sendConnect: identityStore.loadOrCreate() FAILED", err)
+        throw IllegalStateException("Not initialized: identity failed: ${err.message}")
+      }
+      Log.d(loggerTag, "sendConnect: identity deviceId=${identity.deviceId.take(8)}… role=${options.role}")
       val storedToken = deviceAuthStore.loadToken(identity.deviceId, options.role)
       val trimmedToken = token?.trim().orEmpty()
       val authToken = if (storedToken.isNullOrBlank()) trimmedToken else storedToken
       val canFallbackToShared = !storedToken.isNullOrBlank() && trimmedToken.isNotBlank()
+      Log.d(loggerTag, "sendConnect: authToken present=${authToken.isNotEmpty()} storedToken=${!storedToken.isNullOrBlank()} canFallback=$canFallbackToShared")
+      val signature = identityStore.signPayload("test", identity)
+      val pubKey = identityStore.publicKeyBase64Url(identity)
+      Log.d(loggerTag, "sendConnect: signTest=${signature != null} pubKey=${pubKey != null}")
       val payload = buildConnectParams(identity, connectNonce, authToken, password?.trim())
-      val res = request("connect", payload, timeoutMs = 8_000)
+      Log.d(loggerTag, "sendConnect: payload built, sending connect RPC…")
+      val res = try {
+        request("connect", payload, timeoutMs = 8_000)
+      } catch (err: Throwable) {
+        Log.e(loggerTag, "sendConnect: request('connect') threw", err)
+        throw err
+      }
+      Log.d(loggerTag, "sendConnect: response ok=${res.ok} error=${res.error?.message}")
       if (!res.ok) {
         val msg = res.error?.message ?: "connect failed"
         if (canFallbackToShared) {
