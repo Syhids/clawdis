@@ -34,6 +34,7 @@ import ai.openclaw.android.protocol.OpenClawCanvasCommand
 import ai.openclaw.android.protocol.OpenClawScreenCommand
 import ai.openclaw.android.protocol.OpenClawLocationCommand
 import ai.openclaw.android.protocol.OpenClawSmsCommand
+import ai.openclaw.android.pip.PipContentMode
 import ai.openclaw.android.voice.TalkModeManager
 import ai.openclaw.android.voice.VoiceWakeManager
 import kotlinx.coroutines.CoroutineScope
@@ -280,6 +281,9 @@ class NodeRuntime(context: Context) {
   val wakeWords: StateFlow<List<String>> = prefs.wakeWords
   val voiceWakeMode: StateFlow<VoiceWakeMode> = prefs.voiceWakeMode
   val talkEnabled: StateFlow<Boolean> = prefs.talkEnabled
+  val pipEnabled: StateFlow<Boolean> = prefs.pipEnabled
+  val pipAutoEnter: StateFlow<Boolean> = prefs.pipAutoEnter
+  val pipContentMode: StateFlow<PipContentMode> = prefs.pipContentMode
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
@@ -458,6 +462,18 @@ class NodeRuntime(context: Context) {
 
   fun setTalkEnabled(value: Boolean) {
     prefs.setTalkEnabled(value)
+  }
+
+  fun setPipEnabled(value: Boolean) {
+    prefs.setPipEnabled(value)
+  }
+
+  fun setPipAutoEnter(value: Boolean) {
+    prefs.setPipAutoEnter(value)
+  }
+
+  fun setPipContentMode(mode: PipContentMode) {
+    prefs.setPipContentMode(mode)
   }
 
   private fun buildInvokeCommands(): List<String> =

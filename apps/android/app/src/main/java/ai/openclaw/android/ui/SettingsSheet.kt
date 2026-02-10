@@ -65,6 +65,7 @@ import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.NodeForegroundService
 import ai.openclaw.android.VoiceWakeMode
 import ai.openclaw.android.WakeWords
+import ai.openclaw.android.pip.PipContentMode
 
 @Composable
 fun SettingsSheet(viewModel: MainViewModel) {
@@ -90,6 +91,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val remoteAddress by viewModel.remoteAddress.collectAsState()
   val gateways by viewModel.gateways.collectAsState()
   val discoveryStatusText by viewModel.discoveryStatusText.collectAsState()
+  val pipEnabled by viewModel.pipEnabled.collectAsState()
+  val pipAutoEnter by viewModel.pipAutoEnter.collectAsState()
+  val pipContentMode by viewModel.pipContentMode.collectAsState()
 
   val listState = rememberLazyListState()
   val (wakeWordsText, setWakeWordsText) = remember { mutableStateOf("") }
@@ -676,6 +680,70 @@ fun SettingsSheet(viewModel: MainViewModel) {
         supportingContent = { Text("Keeps the screen awake while OpenClaw is open.") },
         trailingContent = { Switch(checked = preventSleep, onCheckedChange = viewModel::setPreventSleep) },
       )
+    }
+
+    item { HorizontalDivider() }
+
+    // Picture-in-Picture
+    item { Text("Picture-in-Picture", style = MaterialTheme.typography.titleSmall) }
+    item {
+      ListItem(
+        headlineContent = { Text("Enable PiP") },
+        supportingContent = { Text("Show a floating overlay when you leave the app.") },
+        trailingContent = { Switch(checked = pipEnabled, onCheckedChange = viewModel::setPipEnabled) },
+      )
+    }
+    item {
+      AnimatedVisibility(visible = pipEnabled) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+          ListItem(
+            headlineContent = { Text("Auto-enter on Navigate Away") },
+            supportingContent = { Text("Automatically enter PiP when pressing Home.") },
+            trailingContent = { Switch(checked = pipAutoEnter, onCheckedChange = viewModel::setPipAutoEnter) },
+          )
+          Text("Content Mode", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
+          ListItem(
+            headlineContent = { Text("Auto") },
+            supportingContent = { Text("Picks the best view based on current activity.") },
+            trailingContent = {
+              RadioButton(
+                selected = pipContentMode == PipContentMode.AUTO,
+                onClick = { viewModel.setPipContentMode(PipContentMode.AUTO) },
+              )
+            },
+          )
+          ListItem(
+            headlineContent = { Text("Talk Orb") },
+            supportingContent = { Text("Always show the animated talk orb.") },
+            trailingContent = {
+              RadioButton(
+                selected = pipContentMode == PipContentMode.TALK_ORB,
+                onClick = { viewModel.setPipContentMode(PipContentMode.TALK_ORB) },
+              )
+            },
+          )
+          ListItem(
+            headlineContent = { Text("Chat Stream") },
+            supportingContent = { Text("Show streaming text and tool calls.") },
+            trailingContent = {
+              RadioButton(
+                selected = pipContentMode == PipContentMode.CHAT_STREAM,
+                onClick = { viewModel.setPipContentMode(PipContentMode.CHAT_STREAM) },
+              )
+            },
+          )
+          ListItem(
+            headlineContent = { Text("Status Only") },
+            supportingContent = { Text("Minimal status indicator.") },
+            trailingContent = {
+              RadioButton(
+                selected = pipContentMode == PipContentMode.STATUS_ONLY,
+                onClick = { viewModel.setPipContentMode(PipContentMode.STATUS_ONLY) },
+              )
+            },
+          )
+        }
+      }
     }
 
     item { HorizontalDivider() }
