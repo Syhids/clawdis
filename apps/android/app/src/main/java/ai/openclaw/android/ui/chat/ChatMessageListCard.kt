@@ -44,9 +44,6 @@ fun ChatMessageListCard(
   // Cache analysis results by message id to avoid re-analyzing on recomposition
   val analysisCache = remember { mutableMapOf<String, ResponseAnalysis>() }
 
-  // Only analyze the last assistant message (per spec: showOnlyOnLastMessage)
-  val lastAssistantIdx = messages.indexOfLast { it.role.lowercase() == "assistant" }
-
   LaunchedEffect(messages.size, pendingRunCount, pendingToolCalls.size, streamingAssistantText) {
     val total =
       messages.size +
@@ -81,8 +78,8 @@ fun ChatMessageListCard(
       ) {
         items(count = messages.size, key = { idx -> messages[idx].id }) { idx ->
           val message = messages[idx]
-          // Only compute analysis for the last assistant message
-          val analysis = if (idx == lastAssistantIdx && message.role.lowercase() == "assistant") {
+          // Compute analysis for all assistant messages
+          val analysis = if (message.role.lowercase() == "assistant") {
             analysisCache.getOrPut(message.id) { analyzer.analyze(message) }
           } else {
             null
