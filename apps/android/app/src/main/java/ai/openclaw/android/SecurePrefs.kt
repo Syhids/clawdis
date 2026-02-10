@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import ai.openclaw.android.pip.PipContentMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -89,6 +90,16 @@ class SecurePrefs(context: Context) {
 
   private val _talkEnabled = MutableStateFlow(prefs.getBoolean("talk.enabled", false))
   val talkEnabled: StateFlow<Boolean> = _talkEnabled
+
+  private val _pipEnabled = MutableStateFlow(prefs.getBoolean("pip.enabled", false))
+  val pipEnabled: StateFlow<Boolean> = _pipEnabled
+
+  private val _pipAutoEnter = MutableStateFlow(prefs.getBoolean("pip.autoEnter", true))
+  val pipAutoEnter: StateFlow<Boolean> = _pipAutoEnter
+
+  private val _pipContentMode =
+    MutableStateFlow(PipContentMode.fromRawValue(prefs.getString("pip.contentMode", "auto")))
+  val pipContentMode: StateFlow<PipContentMode> = _pipContentMode
 
   fun setLastDiscoveredStableId(value: String) {
     val trimmed = value.trim()
@@ -250,6 +261,21 @@ class SecurePrefs(context: Context) {
   fun setTalkEnabled(value: Boolean) {
     prefs.edit { putBoolean("talk.enabled", value) }
     _talkEnabled.value = value
+  }
+
+  fun setPipEnabled(value: Boolean) {
+    prefs.edit { putBoolean("pip.enabled", value) }
+    _pipEnabled.value = value
+  }
+
+  fun setPipAutoEnter(value: Boolean) {
+    prefs.edit { putBoolean("pip.autoEnter", value) }
+    _pipAutoEnter.value = value
+  }
+
+  fun setPipContentMode(mode: PipContentMode) {
+    prefs.edit { putString("pip.contentMode", mode.rawValue) }
+    _pipContentMode.value = mode
   }
 
   private fun loadVoiceWakeMode(): VoiceWakeMode {

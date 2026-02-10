@@ -2,6 +2,7 @@ package ai.openclaw.android
 
 import android.Manifest
 import android.content.pm.ApplicationInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Build
 import android.view.WindowManager
@@ -10,6 +11,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -18,14 +21,17 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import ai.openclaw.android.pip.PipEngine
 import ai.openclaw.android.ui.RootScreen
 import ai.openclaw.android.ui.OpenClawTheme
+import ai.openclaw.android.ui.pip.PipContentView
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels()
   private lateinit var permissionRequester: PermissionRequester
   private lateinit var screenCaptureRequester: ScreenCaptureRequester
+  private lateinit var pipEngine: PipEngine
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -43,6 +49,22 @@ class MainActivity : ComponentActivity() {
     viewModel.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
     viewModel.screenRecorder.attachPermissionRequester(permissionRequester)
 
+    // Initialize PiP engine
+    pipEngine = PipEngine(this).apply {
+      talkEnabled = viewModel.talkEnabled
+      talkIsListening = viewModel.talkIsListening
+      talkIsSpeaking = viewModel.talkIsSpeaking
+      chatStreamingText = viewModel.chatStreamingAssistantText
+      pendingRunCount = viewModel.pendingRunCount
+      isConnected = viewModel.isConnected
+      pipEnabled = viewModel.pipEnabled
+      pipAutoEnter = viewModel.pipAutoEnter
+      pipContentMode = viewModel.pipContentMode
+      onToggleTalk = { viewModel.setTalkEnabled(!viewModel.talkEnabled.value) }
+      onAbort = { viewModel.abortChat() }
+    }
+    pipEngine.initialize()
+
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         viewModel.preventSleep.collect { enabled ->
@@ -57,8 +79,18 @@ class MainActivity : ComponentActivity() {
 
     setContent {
       OpenClawTheme {
+        val isInPipMode by pipEngine.isInPipMode.collectAsState()
+        val resolvedContent by pipEngine.resolvedContent.collectAsState()
+
         Surface(modifier = Modifier) {
-          RootScreen(viewModel = viewModel)
+          if (isInPipMode) {
+            PipContentView(
+              viewModel = viewModel,
+              resolvedContent = resolvedContent,
+            )
+          } else {
+            RootScreen(viewModel = viewModel)
+          }
         }
       }
     }
@@ -84,6 +116,24 @@ class MainActivity : ComponentActivity() {
   override fun onStop() {
     viewModel.setForeground(false)
     super.onStop()
+  }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    pipEngine.onUserLeaveHint()
+  }
+
+  override fun onPictureInPictureModeChanged(
+    isInPictureInPictureMode: Boolean,
+    newConfig: Configuration,
+  ) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    pipEngine.onPictureInPictureModeChanged(isInPictureInPictureMode)
+  }
+
+  override fun onDestroy() {
+    pipEngine.destroy()
+    super.onDestroy()
   }
 
   private fun applyImmersiveMode() {

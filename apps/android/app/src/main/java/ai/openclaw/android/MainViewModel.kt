@@ -8,6 +8,7 @@ import ai.openclaw.android.node.CameraCaptureManager
 import ai.openclaw.android.node.CanvasController
 import ai.openclaw.android.node.ScreenRecordManager
 import ai.openclaw.android.node.SmsManager
+import ai.openclaw.android.pip.PipContentMode
 import kotlinx.coroutines.flow.StateFlow
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -44,6 +45,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val voiceWakeStatusText: StateFlow<String> = runtime.voiceWakeStatusText
   val voiceWakeIsListening: StateFlow<Boolean> = runtime.voiceWakeIsListening
   val talkEnabled: StateFlow<Boolean> = runtime.talkEnabled
+  val pipEnabled: StateFlow<Boolean> = runtime.pipEnabled
+  val pipAutoEnter: StateFlow<Boolean> = runtime.pipAutoEnter
+  val pipContentMode: StateFlow<PipContentMode> = runtime.pipContentMode
   val talkStatusText: StateFlow<String> = runtime.talkStatusText
   val talkIsListening: StateFlow<Boolean> = runtime.talkIsListening
   val talkIsSpeaking: StateFlow<Boolean> = runtime.talkIsSpeaking
@@ -127,6 +131,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setTalkEnabled(enabled: Boolean) {
     runtime.setTalkEnabled(enabled)
+  }
+
+  fun setPipEnabled(enabled: Boolean) {
+    runtime.setPipEnabled(enabled)
+  }
+
+  fun setPipAutoEnter(enabled: Boolean) {
+    runtime.setPipAutoEnter(enabled)
+  }
+
+  fun setPipContentMode(mode: PipContentMode) {
+    runtime.setPipContentMode(mode)
   }
 
   fun refreshGatewayConnection() {
