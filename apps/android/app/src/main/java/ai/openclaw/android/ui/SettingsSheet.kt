@@ -55,6 +55,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -82,6 +83,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
   val manualTls by viewModel.manualTls.collectAsState()
+  val gatewayToken by viewModel.gatewayToken.collectAsState()
   val canvasDebugStatusEnabled by viewModel.canvasDebugStatusEnabled.collectAsState()
   val statusText by viewModel.statusText.collectAsState()
   val serverName by viewModel.serverName.collectAsState()
@@ -408,6 +410,27 @@ fun SettingsSheet(viewModel: MainViewModel) {
             supportingContent = { Text("Pin the gateway certificate on first connect.") },
             trailingContent = { Switch(checked = manualTls, onCheckedChange = viewModel::setManualTls, enabled = manualEnabled) },
             modifier = Modifier.alpha(if (manualEnabled) 1f else 0.5f),
+          )
+
+          var tokenText by remember { mutableStateOf(gatewayToken) }
+          OutlinedTextField(
+            value = tokenText,
+            onValueChange = { tokenText = it },
+            label = { Text("Gateway Token") },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focusState ->
+              if (!focusState.isFocused && tokenText != gatewayToken) {
+                viewModel.setGatewayToken(tokenText)
+              }
+            },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+              onDone = {
+                viewModel.setGatewayToken(tokenText)
+                focusManager.clearFocus()
+              },
+            ),
           )
 
           val hostOk = manualHost.trim().isNotEmpty()
