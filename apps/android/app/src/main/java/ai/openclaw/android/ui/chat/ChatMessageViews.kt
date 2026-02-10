@@ -2,6 +2,12 @@ package ai.openclaw.android.ui.chat
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -155,10 +161,52 @@ fun ChatStreamingAssistantBubble(text: String) {
       shape = RoundedCornerShape(16.dp),
       color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-      Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+      Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
         ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
+        // Streaming progress indicator with character count
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+          horizontalArrangement = Arrangement.End,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          StreamingIndicatorDot()
+          Text(
+            text = formatCharCount(text.length),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 6.dp),
+          )
+        }
       }
     }
+  }
+}
+
+@Composable
+private fun StreamingIndicatorDot() {
+  val infiniteTransition = rememberInfiniteTransition(label = "streaming")
+  val alpha by infiniteTransition.animateFloat(
+    initialValue = 0.3f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(600, easing = LinearEasing),
+      repeatMode = RepeatMode.Reverse,
+    ),
+    label = "streamingAlpha",
+  )
+  Surface(
+    modifier = Modifier.size(6.dp).alpha(alpha),
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.primary,
+  ) {}
+}
+
+private fun formatCharCount(count: Int): String {
+  return when {
+    count >= 1000 -> String.format("%.1fk chars", count / 1000.0)
+    else -> "$count chars"
   }
 }
 
