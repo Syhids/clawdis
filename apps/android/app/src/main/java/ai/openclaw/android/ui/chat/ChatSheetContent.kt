@@ -19,9 +19,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.actions.SuggestedAction
@@ -52,7 +51,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val context = LocalContext.current
   val resolver = context.contentResolver
   val scope = rememberCoroutineScope()
-  val clipboardManager = LocalClipboardManager.current
+  val clipboard = LocalClipboard.current
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
 
@@ -67,8 +66,14 @@ fun ChatSheetContent(viewModel: MainViewModel) {
         )
       }
       is SuggestedAction.CopyContent -> {
-        clipboardManager.setText(AnnotatedString(action.content))
-        Toast.makeText(context, "Copiado", Toast.LENGTH_SHORT).show()
+        scope.launch {
+          clipboard.setClipEntry(
+            androidx.compose.ui.platform.ClipEntry(
+              android.content.ClipData.newPlainText("copied", action.content)
+            )
+          )
+          Toast.makeText(context, "Copiado", Toast.LENGTH_SHORT).show()
+        }
       }
       is SuggestedAction.OpenUrl -> {
         try {
