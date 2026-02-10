@@ -176,4 +176,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   fun sendChat(message: String, thinking: String, attachments: List<OutgoingAttachment>) {
     runtime.sendChat(message = message, thinking = thinking, attachments = attachments)
   }
+
+  fun submitFormResponse(message: String) {
+    runtime.submitFormResponse(message = message)
+  }
 }
