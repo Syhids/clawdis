@@ -29,6 +29,7 @@ fun ChatMessageListCard(
   pendingRunCount: Int,
   pendingToolCalls: List<ChatPendingToolCall>,
   streamingAssistantText: String?,
+  thinkingLevel: String = "off",
   modifier: Modifier = Modifier,
 ) {
   val listState = rememberLazyListState()
@@ -65,7 +66,7 @@ fun ChatMessageListCard(
 
         if (pendingRunCount > 0) {
           item(key = "typing") {
-            ChatTypingIndicatorBubble()
+            ChatTypingIndicatorBubble(thinkingLevel = thinkingLevel)
           }
         }
 

@@ -80,6 +80,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       pendingToolCalls = pendingToolCalls,
       streamingAssistantText = streamingAssistantText,
+      thinkingLevel = thinkingLevel,
       modifier = Modifier.weight(1f, fill = true),
     )
 
