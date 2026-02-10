@@ -245,7 +245,17 @@ class GatewaySession(
     }
 
     private fun buildClient(): OkHttpClient {
+      val httpScheme = if (tls != null) "https" else "http"
+      val origin = "$httpScheme://${endpoint.host}:${endpoint.port}"
       val builder = OkHttpClient.Builder()
+        .addNetworkInterceptor { chain ->
+          val req = chain.request()
+          if (req.header("Origin") == null) {
+            chain.proceed(req.newBuilder().addHeader("Origin", origin).build())
+          } else {
+            chain.proceed(req)
+          }
+        }
       val tlsConfig = buildGatewayTlsConfig(tls) { fingerprint ->
         onTlsFingerprint?.invoke(tls?.stableId ?: endpoint.stableId, fingerprint)
       }
