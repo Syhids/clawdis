@@ -16,10 +16,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
+import ai.openclaw.android.actions.ResponseAnalysis
+import ai.openclaw.android.actions.ResponseAnalyzer
+import ai.openclaw.android.actions.SuggestedAction
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatPendingToolCall
 
@@ -29,9 +33,19 @@ fun ChatMessageListCard(
   pendingRunCount: Int,
   pendingToolCalls: List<ChatPendingToolCall>,
   streamingAssistantText: String?,
+  onSmartAction: ((SuggestedAction) -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
   val listState = rememberLazyListState()
+
+  // Analyzer instance (survives recomposition)
+  val analyzer = remember { ResponseAnalyzer() }
+
+  // Cache analysis results by message id to avoid re-analyzing on recomposition
+  val analysisCache = remember { mutableMapOf<String, ResponseAnalysis>() }
+
+  // Only analyze the last assistant message (per spec: showOnlyOnLastMessage)
+  val lastAssistantIdx = messages.indexOfLast { it.role.lowercase() == "assistant" }
 
   LaunchedEffect(messages.size, pendingRunCount, pendingToolCalls.size, streamingAssistantText) {
     val total =
@@ -41,6 +55,12 @@ fun ChatMessageListCard(
         (if (!streamingAssistantText.isNullOrBlank()) 1 else 0)
     if (total <= 0) return@LaunchedEffect
     listState.animateScrollToItem(index = total - 1)
+  }
+
+  // Evict stale cache entries when messages change
+  LaunchedEffect(messages.size) {
+    val currentIds = messages.map { it.id }.toSet()
+    analysisCache.keys.retainAll(currentIds)
   }
 
   Card(
@@ -60,7 +80,18 @@ fun ChatMessageListCard(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp, start = 12.dp, end = 12.dp),
       ) {
         items(count = messages.size, key = { idx -> messages[idx].id }) { idx ->
-          ChatMessageBubble(message = messages[idx])
+          val message = messages[idx]
+          // Only compute analysis for the last assistant message
+          val analysis = if (idx == lastAssistantIdx && message.role.lowercase() == "assistant") {
+            analysisCache.getOrPut(message.id) { analyzer.analyze(message) }
+          } else {
+            null
+          }
+          ChatMessageBubble(
+            message = message,
+            analysis = analysis,
+            onAction = onSmartAction,
+          )
         }
 
         if (pendingRunCount > 0) {

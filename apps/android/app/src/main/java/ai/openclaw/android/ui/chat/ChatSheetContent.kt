@@ -1,8 +1,10 @@
 package ai.openclaw.android.ui.chat
 
 import android.content.ContentResolver
+import android.content.Intent
 import android.net.Uri
 import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -17,9 +19,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.MainViewModel
+import ai.openclaw.android.actions.SuggestedAction
 import ai.openclaw.android.chat.OutgoingAttachment
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -47,8 +52,34 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val context = LocalContext.current
   val resolver = context.contentResolver
   val scope = rememberCoroutineScope()
+  val clipboardManager = LocalClipboardManager.current
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
+
+  // Smart action handler
+  val handleSmartAction: (SuggestedAction) -> Unit = { action ->
+    when (action) {
+      is SuggestedAction.SendMessage -> {
+        viewModel.sendChat(
+          message = action.message,
+          thinking = thinkingLevel,
+          attachments = emptyList(),
+        )
+      }
+      is SuggestedAction.CopyContent -> {
+        clipboardManager.setText(AnnotatedString(action.content))
+        Toast.makeText(context, "Copiado", Toast.LENGTH_SHORT).show()
+      }
+      is SuggestedAction.OpenUrl -> {
+        try {
+          val intent = Intent(Intent.ACTION_VIEW, Uri.parse(action.url))
+          context.startActivity(intent)
+        } catch (_: Throwable) {
+          Toast.makeText(context, "No se pudo abrir el enlace", Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
 
   val pickImages =
     rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -80,6 +111,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       pendingToolCalls = pendingToolCalls,
       streamingAssistantText = streamingAssistantText,
+      onSmartAction = handleSmartAction,
       modifier = Modifier.weight(1f, fill = true),
     )
 

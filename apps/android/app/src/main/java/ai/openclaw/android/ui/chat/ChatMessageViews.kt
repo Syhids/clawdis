@@ -31,6 +31,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
+import ai.openclaw.android.actions.ResponseAnalysis
+import ai.openclaw.android.actions.SuggestedAction
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatMessageContent
 import ai.openclaw.android.chat.ChatPendingToolCall
@@ -40,29 +42,44 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun ChatMessageBubble(message: ChatMessage) {
+fun ChatMessageBubble(
+  message: ChatMessage,
+  analysis: ResponseAnalysis? = null,
+  onAction: ((SuggestedAction) -> Unit)? = null,
+) {
   val isUser = message.role.lowercase() == "user"
 
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-  ) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      color = Color.Transparent,
-      modifier = Modifier.fillMaxWidth(0.92f),
+  Column {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
-      Box(
-        modifier =
-          Modifier
-            .background(bubbleBackground(isUser))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+      Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(0.92f),
       ) {
-        val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
+        Box(
+          modifier =
+            Modifier
+              .background(bubbleBackground(isUser))
+              .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+          val textColor = textColorOverBubble(isUser)
+          ChatMessageBody(content = message.content, textColor = textColor)
+        }
       }
+    }
+
+    // Smart Response Actions bar (assistant messages only)
+    if (!isUser && analysis != null && onAction != null) {
+      ResponseActionsBar(
+        analysis = analysis,
+        onAction = onAction,
+        modifier = Modifier.padding(start = 8.dp),
+      )
     }
   }
 }
