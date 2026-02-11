@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,17 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val scope = rememberCoroutineScope()
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
+
+  // Draft management: persist input text per session
+  val draftStore = remember { DraftStore.getInstance(context) }
+  var inputText by remember(sessionKey) { mutableStateOf(draftStore.get(sessionKey)) }
+
+  // Save draft when session changes or component disposes
+  DisposableEffect(sessionKey) {
+    onDispose {
+      draftStore.set(sessionKey, inputText)
+    }
+  }
 
   val pickImages =
     rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -92,16 +106,24 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       errorText = errorText,
       attachments = attachments,
+      inputText = inputText,
+      onInputChange = { inputText = it },
       onPickImages = { pickImages.launch("image/*") },
       onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
       onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
-      onSelectSession = { key -> viewModel.switchChatSession(key) },
+      onSelectSession = { key ->
+        // Save current draft before switching
+        draftStore.set(sessionKey, inputText)
+        viewModel.switchChatSession(key)
+      },
       onRefresh = {
         viewModel.refreshChat()
         viewModel.refreshChatSessions(limit = 200)
       },
       onAbort = { viewModel.abortChat() },
       onSend = { text ->
+        // Clear draft after sending
+        draftStore.clear(sessionKey)
         val outgoing =
           attachments.map { att ->
             OutgoingAttachment(
