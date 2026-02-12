@@ -230,10 +230,22 @@ fun RootScreen(viewModel: MainViewModel) {
     )
   }
 
-  // Bottom Action Bar — primary actions at the bottom for easy thumb reach.
+  // Settings button — top-right (secondary action, always visible)
+  Popup(alignment = Alignment.TopEnd, properties = PopupProperties(focusable = false)) {
+    Column(
+      modifier = Modifier.windowInsetsPadding(safeOverlayInsets).padding(end = 12.dp, top = 12.dp),
+    ) {
+      OverlayIconButton(
+        onClick = { sheet = Sheet.Settings },
+        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+      )
+    }
+  }
+
+  // Bottom Action Bar — Chat + Talk Mode, always visible for easy thumb reach.
   Popup(alignment = Alignment.BottomCenter, properties = PopupProperties(focusable = false)) {
     AnimatedVisibility(
-      visible = sheet == null && !talkEnabled,
+      visible = sheet == null,
       enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
       exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
     ) {
@@ -242,14 +254,7 @@ fun RootScreen(viewModel: MainViewModel) {
           .windowInsetsPadding(safeBottomInsets)
           .padding(bottom = 16.dp),
       ) {
-        // Settings (secondary, smaller)
-        OverlayIconButton(
-          onClick = { sheet = Sheet.Settings },
-          icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-        )
-
         // Chat (primary, larger)
-        val baseOverlayChat = overlayContainerColor()
         Box {
           OverlayIconButton(
             onClick = {
