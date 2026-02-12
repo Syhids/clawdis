@@ -680,6 +680,24 @@ fun SettingsSheet(viewModel: MainViewModel) {
 
     item { HorizontalDivider() }
 
+    // Companion Display
+    item { Text("Companion Display", style = MaterialTheme.typography.titleSmall) }
+    item {
+      ListItem(
+        headlineContent = { Text("Screen Saver") },
+        supportingContent = {
+          Text("Select OpenClaw as your screen saver in Android Settings to use ambient display mode when charging.")
+        },
+      )
+    }
+    item {
+      Button(onClick = { openScreenSaverSettings(context) }) {
+        Text("Open Screen Saver Settings")
+      }
+    }
+
+    item { HorizontalDivider() }
+
     // Debug
     item { Text("Debug", style = MaterialTheme.typography.titleSmall) }
     item {
@@ -706,4 +724,14 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+private fun openScreenSaverSettings(context: Context) {
+  val intent = Intent(Settings.ACTION_DREAM_SETTINGS)
+  try {
+    context.startActivity(intent)
+  } catch (_: android.content.ActivityNotFoundException) {
+    // Fallback to display settings if screen saver settings not available
+    context.startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+  }
 }

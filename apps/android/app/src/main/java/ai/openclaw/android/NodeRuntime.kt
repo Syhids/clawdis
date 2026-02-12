@@ -219,6 +219,10 @@ class NodeRuntime(context: Context) {
       session = operatorSession,
       json = json,
       supportsChatSubscribe = false,
+      onNewAssistantMessage = {
+        _unreadChatMessages.value++
+        updateLastAgentMessage()
+      },
     )
   private val talkMode: TalkModeManager by lazy {
     TalkModeManager(
@@ -289,6 +293,27 @@ class NodeRuntime(context: Context) {
   val gatewayToken: StateFlow<String> = _gatewayToken
   val lastDiscoveredStableId: StateFlow<String> = prefs.lastDiscoveredStableId
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled
+
+  // Unread message counter — incremented by ChatController on new assistant messages
+  private val _unreadChatMessages = MutableStateFlow(0)
+  val unreadChatMessages: StateFlow<Int> = _unreadChatMessages.asStateFlow()
+
+  // Last assistant message for companion display
+  private val _lastAgentMessage = MutableStateFlow<String?>(null)
+  val lastAgentMessage: StateFlow<String?> = _lastAgentMessage.asStateFlow()
+
+  fun incrementUnreadChat() { _unreadChatMessages.value++ }
+  fun clearUnreadChat() { _unreadChatMessages.value = 0 }
+
+  private fun updateLastAgentMessage() {
+    val messages = chatMessages.value
+    val lastAssistant = messages.lastOrNull { it.role == "assistant" }
+    val text = lastAssistant?.content
+      ?.mapNotNull { it.text?.trim() }
+      ?.filter { it.isNotEmpty() }
+      ?.joinToString("\n")
+    _lastAgentMessage.value = text?.takeIf { it.isNotEmpty() }
+  }
 
   private var didAutoConnect = false
   private var suppressWakeWordsSync = false
