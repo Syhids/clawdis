@@ -90,7 +90,6 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val remoteAddress by viewModel.remoteAddress.collectAsState()
   val gateways by viewModel.gateways.collectAsState()
   val discoveryStatusText by viewModel.discoveryStatusText.collectAsState()
-  val companionEnabled by viewModel.companionEnabled.collectAsState()
 
   val listState = rememberLazyListState()
   val (wakeWordsText, setWakeWordsText) = remember { mutableStateOf("") }
@@ -685,12 +684,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
     item { Text("Companion Display", style = MaterialTheme.typography.titleSmall) }
     item {
       ListItem(
-        headlineContent = { Text("Enable Companion Display") },
+        headlineContent = { Text("Screen Saver") },
         supportingContent = {
-          Text("Turns your phone into a smart ambient display when charging. Configure in Android Settings > Display > Screen saver.")
-        },
-        trailingContent = {
-          Switch(checked = companionEnabled, onCheckedChange = viewModel::setCompanionEnabled)
+          Text("Select OpenClaw as your screen saver in Android Settings to use ambient display mode when charging.")
         },
       )
     }

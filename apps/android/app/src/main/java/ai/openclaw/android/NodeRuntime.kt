@@ -302,14 +302,8 @@ class NodeRuntime(context: Context) {
   private val _lastAgentMessage = MutableStateFlow<String?>(null)
   val lastAgentMessage: StateFlow<String?> = _lastAgentMessage.asStateFlow()
 
-  val companionEnabled: StateFlow<Boolean> = prefs.companionEnabled
-
   fun incrementUnreadChat() { _unreadChatMessages.value++ }
   fun clearUnreadChat() { _unreadChatMessages.value = 0 }
-
-  fun setCompanionEnabled(value: Boolean) {
-    prefs.setCompanionEnabled(value)
-  }
 
   private fun updateLastAgentMessage() {
     val messages = chatMessages.value

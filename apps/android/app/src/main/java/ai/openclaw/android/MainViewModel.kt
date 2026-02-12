@@ -54,7 +54,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val gatewayToken: StateFlow<String> = runtime.gatewayToken
   val canvasDebugStatusEnabled: StateFlow<Boolean> = runtime.canvasDebugStatusEnabled
 
-  val companionEnabled: StateFlow<Boolean> = runtime.companionEnabled
   val lastAgentMessage: StateFlow<String?> = runtime.lastAgentMessage
 
   // Unread message counter for the chat badge
@@ -136,10 +135,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setTalkEnabled(enabled: Boolean) {
     runtime.setTalkEnabled(enabled)
-  }
-
-  fun setCompanionEnabled(value: Boolean) {
-    runtime.setCompanionEnabled(value)
   }
 
   fun refreshGatewayConnection() {
