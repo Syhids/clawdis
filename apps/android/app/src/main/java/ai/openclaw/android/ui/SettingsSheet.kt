@@ -90,6 +90,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val remoteAddress by viewModel.remoteAddress.collectAsState()
   val gateways by viewModel.gateways.collectAsState()
   val discoveryStatusText by viewModel.discoveryStatusText.collectAsState()
+  val companionEnabled by viewModel.companionEnabled.collectAsState()
 
   val listState = rememberLazyListState()
   val (wakeWordsText, setWakeWordsText) = remember { mutableStateOf("") }
@@ -680,6 +681,27 @@ fun SettingsSheet(viewModel: MainViewModel) {
 
     item { HorizontalDivider() }
 
+    // Companion Display
+    item { Text("Companion Display", style = MaterialTheme.typography.titleSmall) }
+    item {
+      ListItem(
+        headlineContent = { Text("Enable Companion Display") },
+        supportingContent = {
+          Text("Turns your phone into a smart ambient display when charging. Configure in Android Settings > Display > Screen saver.")
+        },
+        trailingContent = {
+          Switch(checked = companionEnabled, onCheckedChange = viewModel::setCompanionEnabled)
+        },
+      )
+    }
+    item {
+      Button(onClick = { openScreenSaverSettings(context) }) {
+        Text("Open Screen Saver Settings")
+      }
+    }
+
+    item { HorizontalDivider() }
+
     // Debug
     item { Text("Debug", style = MaterialTheme.typography.titleSmall) }
     item {
@@ -706,4 +728,14 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+private fun openScreenSaverSettings(context: Context) {
+  val intent = Intent(Settings.ACTION_DREAM_SETTINGS)
+  try {
+    context.startActivity(intent)
+  } catch (_: android.content.ActivityNotFoundException) {
+    // Fallback to display settings if screen saver settings not available
+    context.startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+  }
 }
