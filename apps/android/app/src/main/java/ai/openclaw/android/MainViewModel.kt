@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import ai.openclaw.android.gateway.GatewayEndpoint
 import ai.openclaw.android.chat.OutgoingAttachment
+import ai.openclaw.android.intent.IntentBridgeManager
+import ai.openclaw.android.intent.PendingIntentConfirmation
 import ai.openclaw.android.node.CameraCaptureManager
 import ai.openclaw.android.node.CanvasController
 import ai.openclaw.android.node.ScreenRecordManager
@@ -44,6 +46,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val voiceWakeStatusText: StateFlow<String> = runtime.voiceWakeStatusText
   val voiceWakeIsListening: StateFlow<Boolean> = runtime.voiceWakeIsListening
   val talkEnabled: StateFlow<Boolean> = runtime.talkEnabled
+  val intentBridgeEnabled: StateFlow<Boolean> = runtime.intentBridgeEnabled
+  val intentBridge: IntentBridgeManager = runtime.intentBridge
+  val pendingIntentConfirmation: StateFlow<PendingIntentConfirmation?> = runtime.pendingIntentConfirmation
+  val intentWhitelistSize: StateFlow<Int> = runtime.intentWhitelistSize
   val talkStatusText: StateFlow<String> = runtime.talkStatusText
   val talkIsListening: StateFlow<Boolean> = runtime.talkIsListening
   val talkIsSpeaking: StateFlow<Boolean> = runtime.talkIsSpeaking
@@ -133,6 +139,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setTalkEnabled(enabled: Boolean) {
     runtime.setTalkEnabled(enabled)
+  }
+
+  fun setIntentBridgeEnabled(value: Boolean) {
+    runtime.setIntentBridgeEnabled(value)
+  }
+
+  fun clearIntentWhitelist() {
+    runtime.clearIntentWhitelist()
   }
 
   fun refreshGatewayConnection() {

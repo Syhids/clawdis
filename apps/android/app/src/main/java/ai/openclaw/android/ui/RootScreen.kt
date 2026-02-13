@@ -80,6 +80,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import ai.openclaw.android.CameraHudKind
 import ai.openclaw.android.MainViewModel
+import ai.openclaw.android.ui.intent.IntentConfirmationDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -328,6 +329,14 @@ fun RootScreen(viewModel: MainViewModel) {
         isSpeaking = talkIsSpeaking,
       )
     }
+  }
+
+  val pendingIntent by viewModel.pendingIntentConfirmation.collectAsState()
+  pendingIntent?.let { confirmation ->
+    IntentConfirmationDialog(
+      confirmation = confirmation,
+      onResult = { result -> confirmation.deferred.complete(result) },
+    )
   }
 
   val currentSheet = sheet

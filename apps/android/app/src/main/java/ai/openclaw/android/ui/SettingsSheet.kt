@@ -65,6 +65,7 @@ import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.NodeForegroundService
 import ai.openclaw.android.VoiceWakeMode
 import ai.openclaw.android.WakeWords
+import ai.openclaw.android.ui.intent.intentSettingsSection
 
 @Composable
 fun SettingsSheet(viewModel: MainViewModel) {
@@ -665,6 +666,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
+
+    // App Actions & Intents
+    intentSettingsSection(viewModel)
 
     item { HorizontalDivider() }
 
