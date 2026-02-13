@@ -23,6 +23,7 @@ class ChatController(
   private val session: GatewaySession,
   private val json: Json,
   private val supportsChatSubscribe: Boolean,
+  private val onNewAssistantMessage: (() -> Unit)? = null,
 ) {
   private val _sessionKey = MutableStateFlow("main")
   val sessionKey: StateFlow<String> = _sessionKey.asStateFlow()
@@ -328,6 +329,9 @@ class ChatController(
       "final", "aborted", "error" -> {
         if (state == "error") {
           _errorText.value = payload["errorMessage"].asStringOrNull() ?: "Chat failed"
+        }
+        if (state == "final") {
+          onNewAssistantMessage?.invoke()
         }
         if (runId != null) clearPendingRun(runId) else clearPendingRuns()
         pendingToolCallsById.clear()

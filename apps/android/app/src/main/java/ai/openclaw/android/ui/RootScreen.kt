@@ -19,9 +19,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -30,6 +38,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -37,6 +47,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ScreenShare
@@ -59,7 +70,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
@@ -74,7 +87,9 @@ fun RootScreen(viewModel: MainViewModel) {
   var sheet by remember { mutableStateOf<Sheet?>(null) }
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val safeOverlayInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+  val safeBottomInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
   val context = LocalContext.current
+  val haptics = LocalHapticFeedback.current
   val serverName by viewModel.serverName.collectAsState()
   val statusText by viewModel.statusText.collectAsState()
   val cameraHud by viewModel.cameraHud.collectAsState()
@@ -88,6 +103,7 @@ fun RootScreen(viewModel: MainViewModel) {
   val talkIsSpeaking by viewModel.talkIsSpeaking.collectAsState()
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
+  val unreadMessages by viewModel.unreadMessages.collectAsState()
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
@@ -214,53 +230,92 @@ fun RootScreen(viewModel: MainViewModel) {
     )
   }
 
+  // Settings button — top-right (secondary action, always visible)
   Popup(alignment = Alignment.TopEnd, properties = PopupProperties(focusable = false)) {
     Column(
       modifier = Modifier.windowInsetsPadding(safeOverlayInsets).padding(end = 12.dp, top = 12.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
-      horizontalAlignment = Alignment.End,
     ) {
-      OverlayIconButton(
-        onClick = { sheet = Sheet.Chat },
-        icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
-      )
-
-      // Talk mode gets a dedicated side bubble instead of burying it in settings.
-      val baseOverlay = overlayContainerColor()
-      val talkContainer =
-        lerp(
-          baseOverlay,
-          seamColor.copy(alpha = baseOverlay.alpha),
-          if (talkEnabled) 0.35f else 0.22f,
-        )
-      val talkContent = if (talkEnabled) seamColor else overlayIconColor()
-      OverlayIconButton(
-        onClick = {
-          val next = !talkEnabled
-          if (next) {
-            val micOk =
-              ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PackageManager.PERMISSION_GRANTED
-            if (!micOk) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            viewModel.setTalkEnabled(true)
-          } else {
-            viewModel.setTalkEnabled(false)
-          }
-        },
-        containerColor = talkContainer,
-        contentColor = talkContent,
-        icon = {
-          Icon(
-            Icons.Default.RecordVoiceOver,
-            contentDescription = "Talk Mode",
-          )
-        },
-      )
-
       OverlayIconButton(
         onClick = { sheet = Sheet.Settings },
         icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
       )
+    }
+  }
+
+  // Bottom Action Bar — Chat + Talk Mode, always visible for easy thumb reach.
+  Popup(alignment = Alignment.BottomCenter, properties = PopupProperties(focusable = false)) {
+    AnimatedVisibility(
+      visible = sheet == null,
+      enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+      exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+    ) {
+      BottomActionBar(
+        modifier = Modifier
+          .windowInsetsPadding(safeBottomInsets)
+          .padding(bottom = 16.dp),
+      ) {
+        // Chat (primary, larger)
+        Box {
+          OverlayIconButton(
+            onClick = {
+              haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+              viewModel.clearUnread()
+              sheet = Sheet.Chat
+            },
+            size = 56.dp,
+            icon = {
+              Icon(
+                Icons.Default.ChatBubble,
+                contentDescription = "Chat",
+                modifier = Modifier.size(28.dp),
+              )
+            },
+          )
+          if (unreadMessages > 0) {
+            Badge(
+              modifier = Modifier.align(Alignment.TopEnd),
+              containerColor = MaterialTheme.colorScheme.error,
+            ) {
+              Text("$unreadMessages", style = MaterialTheme.typography.labelSmall)
+            }
+          }
+        }
+
+        // Talk Mode (primary, larger)
+        val baseOverlay = overlayContainerColor()
+        val talkContainer =
+          lerp(
+            baseOverlay,
+            seamColor.copy(alpha = baseOverlay.alpha),
+            if (talkEnabled) 0.35f else 0.22f,
+          )
+        val talkContent = if (talkEnabled) seamColor else overlayIconColor()
+        OverlayIconButton(
+          onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            val next = !talkEnabled
+            if (next) {
+              val micOk =
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                  PackageManager.PERMISSION_GRANTED
+              if (!micOk) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+              viewModel.setTalkEnabled(true)
+            } else {
+              viewModel.setTalkEnabled(false)
+            }
+          },
+          size = 56.dp,
+          containerColor = talkContainer,
+          contentColor = talkContent,
+          icon = {
+            Icon(
+              Icons.Default.RecordVoiceOver,
+              contentDescription = "Talk Mode",
+              modifier = Modifier.size(28.dp),
+            )
+          },
+        )
+      }
     }
   }
 
@@ -298,12 +353,13 @@ private enum class Sheet {
 private fun OverlayIconButton(
   onClick: () -> Unit,
   icon: @Composable () -> Unit,
+  size: androidx.compose.ui.unit.Dp = 44.dp,
   containerColor: ComposeColor? = null,
   contentColor: ComposeColor? = null,
 ) {
   FilledTonalIconButton(
     onClick = onClick,
-    modifier = Modifier.size(44.dp),
+    modifier = Modifier.size(size),
     colors =
       IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = containerColor ?: overlayContainerColor(),
@@ -312,6 +368,24 @@ private fun OverlayIconButton(
   ) {
     icon()
   }
+}
+
+@Composable
+private fun BottomActionBar(
+  modifier: Modifier = Modifier,
+  content: @Composable RowScope.() -> Unit,
+) {
+  Row(
+    modifier = modifier
+      .background(
+        color = overlayContainerColor().copy(alpha = 0.92f),
+        shape = RoundedCornerShape(28.dp),
+      )
+      .padding(horizontal = 16.dp, vertical = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    content = content,
+  )
 }
 
 @SuppressLint("SetJavaScriptEnabled")
