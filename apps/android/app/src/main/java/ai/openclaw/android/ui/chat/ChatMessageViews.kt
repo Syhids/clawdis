@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -94,25 +92,16 @@ fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
 }
 
 /**
- * A single bubble within a group (no avatar, tighter spacing).
+ * A single message within a group — flat layout, no bubble chrome.
  */
 @Composable
 private fun GroupedBubble(message: ChatMessage, isUser: Boolean) {
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
-    color = Color.Transparent,
-  ) {
-    Box(
-      modifier = Modifier
-        .background(bubbleBackground(isUser))
-        .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-      val textColor = textColorOverBubble(isUser)
-      ChatMessageBody(content = message.content, textColor = textColor)
-    }
+  val textColor = if (isUser) {
+    MaterialTheme.colorScheme.primary
+  } else {
+    MaterialTheme.colorScheme.onSurface
   }
+  ChatMessageBody(content = message.content, textColor = textColor)
 }
 
 /**
@@ -139,7 +128,7 @@ private fun GroupFooter(role: String, timestamp: Long?, isUser: Boolean) {
 }
 
 /**
- * Streaming group: avatar + streaming bubble, displayed as assistant.
+ * Streaming group: avatar + streaming text, displayed as assistant.
  */
 @Composable
 fun ChatStreamingGroupView(text: String) {
@@ -152,14 +141,7 @@ fun ChatStreamingGroupView(text: String) {
     Spacer(modifier = Modifier.width(8.dp))
 
     Column(modifier = Modifier.fillMaxWidth(0.85f)) {
-      Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-      ) {
-        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-          ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
-        }
-      }
+      ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
     }
   }
 }
@@ -200,27 +182,22 @@ private fun formatTimestamp(timestampMs: Long): String {
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
   val isUser = message.role.lowercase() == "user"
+  val textColor = if (isUser) {
+    MaterialTheme.colorScheme.primary
+  } else {
+    MaterialTheme.colorScheme.onSurface
+  }
 
   Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
   ) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      color = Color.Transparent,
-      modifier = Modifier.fillMaxWidth(0.92f),
+    Box(
+      modifier = Modifier
+        .fillMaxWidth(0.92f)
+        .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
-      Box(
-        modifier =
-          Modifier
-            .background(bubbleBackground(isUser))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-      ) {
-        val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
-      }
+      ChatMessageBody(content = message.content, textColor = textColor)
     }
   }
 }
@@ -245,20 +222,18 @@ private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color)
 
 @Composable
 fun ChatTypingIndicatorBubble() {
-  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-      Row(
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        DotPulse()
-        Text("Thinking\u2026", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-      }
-    }
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+    horizontalArrangement = Arrangement.Start,
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    DotPulse()
+    Text(
+      "Thinking\u2026",
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(start = 8.dp),
+    )
   }
 }
 
@@ -269,76 +244,47 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
     remember(toolCalls, context) {
       toolCalls.map { ToolDisplayRegistry.resolve(context, it.name, it.args) }
     }
-  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-      Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Running tools\u2026", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-        for (display in displays.take(6)) {
-          Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-              "${display.emoji} ${display.label}",
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              fontFamily = FontFamily.Monospace,
-            )
-            display.detailLine?.let { detail ->
-              Text(
-                detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Monospace,
-              )
-            }
-          }
-        }
-        if (toolCalls.size > 6) {
+
+  Column(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    Text("Running tools\u2026", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+    for (display in displays.take(6)) {
+      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+          "${display.emoji} ${display.label}",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          fontFamily = FontFamily.Monospace,
+        )
+        display.detailLine?.let { detail ->
           Text(
-            "\u2026 +${toolCalls.size - 6} more",
+            detail,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
           )
         }
       }
+    }
+    if (toolCalls.size > 6) {
+      Text(
+        "\u2026 +${toolCalls.size - 6} more",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
     }
   }
 }
 
 @Composable
 fun ChatStreamingAssistantBubble(text: String) {
-  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-      Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-        ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
-      }
-    }
-  }
-}
-
-@Composable
-private fun bubbleBackground(isUser: Boolean): Brush {
-  return if (isUser) {
-    Brush.linearGradient(
-      colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)),
-    )
-  } else {
-    Brush.linearGradient(
-      colors = listOf(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.surfaceContainerHigh),
-    )
-  }
-}
-
-@Composable
-private fun textColorOverBubble(isUser: Boolean): Color {
-  return if (isUser) {
-    MaterialTheme.colorScheme.onPrimary
-  } else {
-    MaterialTheme.colorScheme.onSurface
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+    horizontalArrangement = Arrangement.Start,
+  ) {
+    ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
   }
 }
 
@@ -385,23 +331,30 @@ private fun DotPulse() {
 
 @Composable
 private fun PulseDot(alpha: Float) {
-  Surface(
-    modifier = Modifier.size(6.dp).alpha(alpha),
-    shape = CircleShape,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  ) {}
+  Box(
+    modifier = Modifier
+      .size(6.dp)
+      .alpha(alpha)
+      .background(
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = CircleShape,
+      ),
+  )
 }
 
 @Composable
 fun ChatCodeBlock(code: String, language: String?) {
-  Surface(
-    shape = RoundedCornerShape(12.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-    modifier = Modifier.fillMaxWidth(),
+  Box(
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = RoundedCornerShape(8.dp),
+      )
+      .padding(10.dp),
   ) {
     Text(
       text = code.trimEnd(),
-      modifier = Modifier.padding(10.dp),
       fontFamily = FontFamily.Monospace,
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurface,
