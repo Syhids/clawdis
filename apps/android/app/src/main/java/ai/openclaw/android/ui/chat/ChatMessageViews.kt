@@ -48,8 +48,7 @@ import java.util.Locale
 // ─── Grouped Message Views ──────────────────────────────────────────────────
 
 /**
- * Renders a message group: avatar + stacked bubbles + footer (name · timestamp).
- * Avatar is bottom-aligned with the group.
+ * Renders a message group: stacked bubbles + footer (name · timestamp).
  */
 @Composable
 fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
@@ -60,11 +59,6 @@ fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
     horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     verticalAlignment = Alignment.Bottom,
   ) {
-    if (!isUser) {
-      ChatAvatar(role = group.role)
-      Spacer(modifier = Modifier.width(8.dp))
-    }
-
     Column(
       modifier = Modifier.fillMaxWidth(0.85f),
       horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
@@ -84,11 +78,6 @@ fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
         timestamp = group.timestamp,
         isUser = isUser,
       )
-    }
-
-    if (isUser) {
-      Spacer(modifier = Modifier.width(8.dp))
-      ChatAvatar(role = group.role)
     }
   }
 }
@@ -139,7 +128,7 @@ private fun GroupFooter(role: String, timestamp: Long?, isUser: Boolean) {
 }
 
 /**
- * Streaming group: avatar + streaming bubble, displayed as assistant.
+ * Streaming group: streaming bubble, displayed as assistant.
  */
 @Composable
 fun ChatStreamingGroupView(text: String) {
@@ -148,9 +137,6 @@ fun ChatStreamingGroupView(text: String) {
     horizontalArrangement = Arrangement.Start,
     verticalAlignment = Alignment.Bottom,
   ) {
-    ChatAvatar(role = "assistant")
-    Spacer(modifier = Modifier.width(8.dp))
-
     Column(modifier = Modifier.fillMaxWidth(0.85f)) {
       Surface(
         shape = RoundedCornerShape(16.dp),
@@ -165,7 +151,7 @@ fun ChatStreamingGroupView(text: String) {
 }
 
 /**
- * Typing indicator with avatar, showing dot pulse + optional tool calls.
+ * Typing indicator showing dot pulse + optional tool calls.
  */
 @Composable
 fun ChatTypingGroupView(toolCalls: List<ChatPendingToolCall>) {
@@ -174,9 +160,6 @@ fun ChatTypingGroupView(toolCalls: List<ChatPendingToolCall>) {
     horizontalArrangement = Arrangement.Start,
     verticalAlignment = Alignment.Bottom,
   ) {
-    ChatAvatar(role = "assistant")
-    Spacer(modifier = Modifier.width(8.dp))
-
     Column(modifier = Modifier.fillMaxWidth(0.85f)) {
       if (toolCalls.isNotEmpty()) {
         ChatPendingToolsBubble(toolCalls = toolCalls)
