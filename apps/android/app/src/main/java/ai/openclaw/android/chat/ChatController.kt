@@ -148,6 +148,7 @@ class ChatController(
           role = "user",
           content = userContent,
           timestampMs = System.currentTimeMillis(),
+          category = MessageCategory.User,
         )
 
     armPendingRunTimeout(runId)
@@ -362,7 +363,13 @@ class ChatController(
       "assistant" -> {
         val text = data?.get("text")?.asStringOrNull()
         if (!text.isNullOrEmpty()) {
-          _streamingAssistantText.value = text
+          // Don't show internal tokens while streaming
+          val trimmed = text.trim()
+          if (trimmed == "NO_REPLY" || trimmed == "HEARTBEAT_OK") {
+            _streamingAssistantText.value = null
+          } else {
+            _streamingAssistantText.value = text
+          }
         }
       }
       "tool" -> {
@@ -448,16 +455,75 @@ class ChatController(
         val obj = item.asObjectOrNull() ?: return@mapNotNull null
         val role = obj["role"].asStringOrNull() ?: return@mapNotNull null
         val content = obj["content"].asArrayOrNull()?.mapNotNull(::parseMessageContent) ?: emptyList()
+        val textContent = content.mapNotNull { it.text }.joinToString("\n")
+
+        // Filter out internal/noise messages
+        if (!shouldShowMessage(role, textContent)) return@mapNotNull null
+
         val ts = obj["timestamp"].asLongOrNull()
         ChatMessage(
           id = UUID.randomUUID().toString(),
           role = role,
           content = content,
           timestampMs = ts,
+          category = categorizeMessage(role, textContent),
         )
       }
 
     return ChatHistory(sessionKey = sessionKey, sessionId = sid, thinkingLevel = thinkingLevel, messages = messages)
+  }
+
+  companion object {
+    /** Returns false for internal messages that should be hidden from the user. */
+    fun shouldShowMessage(role: String, text: String?): Boolean {
+      // Always hide system messages (agent config, not conversation)
+      if (role == "system") return false
+
+      val t = text?.trim() ?: return true
+      if (t.isEmpty()) return false
+
+      // NO_REPLY — internal "stay silent" token
+      if (t == "NO_REPLY" || t.startsWith("NO_REPLY\n") || t.endsWith("\nNO_REPLY") || t.endsWith("NO_REPLY")) {
+        // Check it's not a real message that just mentions NO_REPLY
+        val stripped = t.replace("NO_REPLY", "").trim()
+        if (stripped.isEmpty()) return false
+      }
+
+      // HEARTBEAT_OK — internal heartbeat ack
+      if (t == "HEARTBEAT_OK" || t.startsWith("HEARTBEAT_OK\n") || t.startsWith("HEARTBEAT_OK ")) return false
+
+      // Heartbeat prompts — polling instructions
+      if (t.contains("HEARTBEAT") && t.contains("HEARTBEAT.md")) return false
+      if (t.startsWith("Heartbeat prompt:")) return false
+
+      // Memory flush prompts
+      if (t.startsWith("Pre-compaction memory flush")) return false
+
+      // Compaction summaries
+      if (t.startsWith("The conversation history before this point was compacted")) return false
+
+      return true
+    }
+
+    /** Classifies a message for visual styling in the chat UI. */
+    fun categorizeMessage(role: String, text: String?): MessageCategory {
+      if (role == "user") return MessageCategory.User
+
+      val t = text?.trim() ?: return MessageCategory.Assistant
+
+      // System events: timestamped exec/cron notifications like "[2026-02-12 23:08:06 GMT+1] ..."
+      if (t.startsWith("[") && SYSTEM_EVENT_PREFIX.containsMatchIn(t)) return MessageCategory.SystemEvent
+
+      // System events: "System:" prefixed
+      if (t.startsWith("System:")) return MessageCategory.SystemEvent
+
+      // Cron/scheduled task results
+      if (t.startsWith("Cron ") || t.startsWith("Scheduled ")) return MessageCategory.SystemEvent
+
+      return MessageCategory.Assistant
+    }
+
+    private val SYSTEM_EVENT_PREFIX = Regex("""^\[\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}""")
   }
 
   private fun parseMessageContent(el: JsonElement): ChatMessageContent? {

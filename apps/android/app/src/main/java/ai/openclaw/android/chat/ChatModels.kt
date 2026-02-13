@@ -1,10 +1,23 @@
 package ai.openclaw.android.chat
 
+/** Visual category for message styling in the UI. */
+enum class MessageCategory {
+  /** Normal user message. */
+  User,
+  /** Normal assistant reply. */
+  Assistant,
+  /** System event (cron, exec, scheduled task). */
+  SystemEvent,
+  /** Tool/function output shown inline. */
+  ToolResult,
+}
+
 data class ChatMessage(
   val id: String,
   val role: String,
   val content: List<ChatMessageContent>,
   val timestampMs: Long?,
+  val category: MessageCategory = MessageCategory.Assistant,
 )
 
 data class ChatMessageContent(
