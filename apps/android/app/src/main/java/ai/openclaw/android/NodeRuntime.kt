@@ -280,6 +280,7 @@ class NodeRuntime(context: Context) {
       session = operatorSession,
       json = json,
       supportsChatSubscribe = false,
+      onNewAssistantMessage = { _unreadChatMessages.value++ },
     )
   private val talkMode: TalkModeManager by lazy {
     TalkModeManager(
@@ -348,6 +349,13 @@ class NodeRuntime(context: Context) {
   fun setGatewayToken(value: String) = prefs.setGatewayToken(value)
   val lastDiscoveredStableId: StateFlow<String> = prefs.lastDiscoveredStableId
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled
+
+  // Unread message counter — incremented by ChatController on new assistant messages
+  private val _unreadChatMessages = MutableStateFlow(0)
+  val unreadChatMessages: StateFlow<Int> = _unreadChatMessages.asStateFlow()
+
+  fun incrementUnreadChat() { _unreadChatMessages.value++ }
+  fun clearUnreadChat() { _unreadChatMessages.value = 0 }
 
   private var didAutoConnect = false
 

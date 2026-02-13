@@ -1,10 +1,14 @@
 package ai.openclaw.android.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.ui.chat.ChatSheetContent
 
 @Composable
 fun ChatSheet(viewModel: MainViewModel) {
+  LaunchedEffect(Unit) {
+    viewModel.clearUnread()
+  }
   ChatSheetContent(viewModel = viewModel)
 }
