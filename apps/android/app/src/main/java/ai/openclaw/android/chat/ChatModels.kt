@@ -42,3 +42,11 @@ data class OutgoingAttachment(
   val fileName: String,
   val base64: String,
 )
+
+data class QueuedChatMessage(
+  val id: String,
+  val text: String,
+  val attachments: List<OutgoingAttachment> = emptyList(),
+  val thinkingLevel: String = "off",
+  val createdAt: Long = System.currentTimeMillis(),
+)

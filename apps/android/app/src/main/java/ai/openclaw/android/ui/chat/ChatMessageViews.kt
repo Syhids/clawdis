@@ -1,8 +1,15 @@
 package ai.openclaw.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,17 +37,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatMessageContent
 import ai.openclaw.android.chat.ChatPendingToolCall
 import ai.openclaw.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,10 +57,21 @@ import java.util.Locale
 
 /**
  * Renders a message group: stacked bubbles + footer (name · timestamp).
+ * Long-press on assistant messages copies raw markdown to clipboard.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
   val isUser = group.role == "user"
+  val haptic = LocalHapticFeedback.current
+  val context = LocalContext.current
+
+  // Extract raw markdown text from all messages in group
+  val rawMarkdown = remember(group.messages) {
+    group.messages.flatMap { msg ->
+      msg.content.filter { it.type == "text" }.mapNotNull { it.text }
+    }.joinToString("\n\n")
+  }
 
   Row(
     modifier = Modifier.fillMaxWidth(),
@@ -60,7 +79,23 @@ fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
     verticalAlignment = Alignment.Bottom,
   ) {
     Column(
-      modifier = Modifier.fillMaxWidth(0.85f),
+      modifier = Modifier
+        .fillMaxWidth(0.85f)
+        .then(
+          if (rawMarkdown.isNotBlank()) {
+            Modifier.combinedClickable(
+              onClick = {},
+              onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("message", rawMarkdown))
+                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+              },
+            )
+          } else {
+            Modifier
+          },
+        ),
       horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
       // Stacked message bubbles
@@ -83,7 +118,7 @@ fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
 }
 
 /**
- * A single bubble within a group (no avatar, tighter spacing).
+ * A single bubble within a group.
  */
 @Composable
 private fun GroupedBubble(message: ChatMessage, isUser: Boolean) {
@@ -368,11 +403,12 @@ private fun DotPulse() {
 
 @Composable
 private fun PulseDot(alpha: Float) {
-  Surface(
-    modifier = Modifier.size(6.dp).alpha(alpha),
-    shape = CircleShape,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  ) {}
+  Box(
+    modifier = Modifier
+      .size(6.dp)
+      .alpha(alpha)
+      .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
+  )
 }
 
 @Composable

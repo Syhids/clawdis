@@ -13,16 +13,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,8 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.chat.ChatSessionEntry
+import ai.openclaw.android.chat.QueuedChatMessage
 
 @Composable
 fun ChatComposer(
@@ -50,6 +57,7 @@ fun ChatComposer(
   pendingRunCount: Int,
   errorText: String?,
   attachments: List<PendingImageAttachment>,
+  chatQueue: List<QueuedChatMessage>,
   onPickImages: () -> Unit,
   onRemoveAttachment: (id: String) -> Unit,
   onSetThinkingLevel: (level: String) -> Unit,
@@ -57,6 +65,8 @@ fun ChatComposer(
   onRefresh: () -> Unit,
   onAbort: () -> Unit,
   onSend: (text: String) -> Unit,
+  onNewSession: () -> Unit,
+  onRemoveFromQueue: (id: String) -> Unit,
 ) {
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
@@ -66,7 +76,8 @@ fun ChatComposer(
   val currentSessionLabel =
     sessionOptions.firstOrNull { it.key == sessionKey }?.displayName ?: sessionKey
 
-  val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
+  // Allow sending even when busy (messages will be queued)
+  val canSend = (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
 
   Surface(
     shape = MaterialTheme.shapes.large,
@@ -126,6 +137,14 @@ fun ChatComposer(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        FilledTonalIconButton(
+          onClick = onNewSession,
+          modifier = Modifier.size(42.dp),
+          enabled = pendingRunCount == 0 && healthOk,
+        ) {
+          Icon(Icons.Default.AddComment, contentDescription = "New session")
+        }
+
         FilledTonalIconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
           Icon(Icons.Default.Refresh, contentDescription = "Refresh")
         }
@@ -133,6 +152,11 @@ fun ChatComposer(
         FilledTonalIconButton(onClick = onPickImages, modifier = Modifier.size(42.dp)) {
           Icon(Icons.Default.AttachFile, contentDescription = "Add image")
         }
+      }
+
+      // Queue preview
+      if (chatQueue.isNotEmpty()) {
+        QueuePreview(queue = chatQueue, onRemove = onRemoveFromQueue)
       }
 
       if (attachments.isNotEmpty()) {
@@ -153,6 +177,7 @@ fun ChatComposer(
         Spacer(modifier = Modifier.weight(1f))
 
         if (pendingRunCount > 0) {
+          // Show abort button
           FilledTonalIconButton(
             onClick = onAbort,
             colors =
@@ -162,6 +187,24 @@ fun ChatComposer(
               ),
           ) {
             Icon(Icons.Default.Stop, contentDescription = "Abort")
+          }
+          Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        // Send button — always visible; if busy, messages are queued
+        if (chatQueue.isNotEmpty()) {
+          BadgedBox(
+            badge = {
+              Badge { Text("${chatQueue.size}") }
+            },
+          ) {
+            FilledTonalIconButton(onClick = {
+              val text = input
+              input = ""
+              onSend(text)
+            }, enabled = canSend) {
+              Icon(Icons.Default.ArrowUpward, contentDescription = "Send (queued)")
+            }
           }
         } else {
           FilledTonalIconButton(onClick = {
@@ -180,6 +223,54 @@ fun ChatComposer(
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.error,
           maxLines = 2,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun QueuePreview(queue: List<QueuedChatMessage>, onRemove: (String) -> Unit) {
+  Surface(
+    shape = RoundedCornerShape(12.dp),
+    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+      Text(
+        "Queued (${queue.size})",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      for (item in queue.take(3)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            item.text.take(60) + if (item.text.length > 60) "…" else "",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          IconButton(
+            onClick = { onRemove(item.id) },
+            modifier = Modifier.size(24.dp),
+          ) {
+            Icon(
+              Icons.Default.Close,
+              contentDescription = "Remove",
+              modifier = Modifier.size(14.dp),
+            )
+          }
+        }
+      }
+      if (queue.size > 3) {
+        Text(
+          "+${queue.size - 3} more",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }

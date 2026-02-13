@@ -12,6 +12,7 @@ import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatPendingToolCall
 import ai.openclaw.android.chat.ChatSessionEntry
 import ai.openclaw.android.chat.OutgoingAttachment
+import ai.openclaw.android.chat.QueuedChatMessage
 import ai.openclaw.android.gateway.DeviceAuthStore
 import ai.openclaw.android.gateway.DeviceIdentityStore
 import ai.openclaw.android.gateway.GatewayClientInfo
@@ -311,6 +312,7 @@ class NodeRuntime(context: Context) {
   val chatStreamingAssistantText: StateFlow<String?> = chat.streamingAssistantText
   val chatPendingToolCalls: StateFlow<List<ChatPendingToolCall>> = chat.pendingToolCalls
   val chatSessions: StateFlow<List<ChatSessionEntry>> = chat.sessions
+  val chatQueue: StateFlow<List<QueuedChatMessage>> = chat.chatQueue
   val pendingRunCount: StateFlow<Int> = chat.pendingRunCount
 
   init {
@@ -767,6 +769,10 @@ class NodeRuntime(context: Context) {
 
   fun sendChat(message: String, thinking: String, attachments: List<OutgoingAttachment>) {
     chat.sendMessage(message = message, thinkingLevel = thinking, attachments = attachments)
+  }
+
+  fun removeChatQueueItem(id: String) {
+    chat.removeFromQueue(id)
   }
 
   private fun handleGatewayEvent(event: String, payloadJson: String?) {

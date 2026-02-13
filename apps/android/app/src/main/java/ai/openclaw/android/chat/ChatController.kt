@@ -56,6 +56,9 @@ class ChatController(
   private val _sessions = MutableStateFlow<List<ChatSessionEntry>>(emptyList())
   val sessions: StateFlow<List<ChatSessionEntry>> = _sessions.asStateFlow()
 
+  private val _chatQueue = MutableStateFlow<List<QueuedChatMessage>>(emptyList())
+  val chatQueue: StateFlow<List<QueuedChatMessage>> = _chatQueue.asStateFlow()
+
   private val pendingRuns = mutableSetOf<String>()
   private val pendingRunTimeoutJobs = ConcurrentHashMap<String, Job>()
   private val pendingRunTimeoutMs = 120_000L
@@ -111,6 +114,45 @@ class ChatController(
   }
 
   fun sendMessage(
+    message: String,
+    thinkingLevel: String,
+    attachments: List<OutgoingAttachment>,
+  ) {
+    val trimmed = message.trim()
+    if (trimmed.isEmpty() && attachments.isEmpty()) return
+    if (!_healthOk.value) {
+      _errorText.value = "Gateway health not OK; cannot send"
+      return
+    }
+
+    // If busy, queue the message instead of sending immediately
+    if (_pendingRunCount.value > 0) {
+      val queued = QueuedChatMessage(
+        id = UUID.randomUUID().toString(),
+        text = trimmed.ifEmpty { "See attached." },
+        attachments = attachments,
+        thinkingLevel = thinkingLevel,
+      )
+      _chatQueue.value = _chatQueue.value + queued
+      return
+    }
+
+    sendMessageInternal(trimmed, thinkingLevel, attachments)
+  }
+
+  fun removeFromQueue(id: String) {
+    _chatQueue.value = _chatQueue.value.filter { it.id != id }
+  }
+
+  private fun flushQueue() {
+    val queue = _chatQueue.value
+    if (queue.isEmpty()) return
+    val next = queue.first()
+    _chatQueue.value = queue.drop(1)
+    sendMessageInternal(next.text, next.thinkingLevel, next.attachments)
+  }
+
+  private fun sendMessageInternal(
     message: String,
     thinkingLevel: String,
     attachments: List<OutgoingAttachment>,
@@ -358,6 +400,8 @@ class ChatController(
           } catch (_: Throwable) {
             // best-effort
           }
+          // Flush queued messages after history refresh
+          flushQueue()
         }
       }
     }

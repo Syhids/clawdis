@@ -69,6 +69,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val chatStreamingAssistantText: StateFlow<String?> = runtime.chatStreamingAssistantText
   val chatPendingToolCalls = runtime.chatPendingToolCalls
   val chatSessions = runtime.chatSessions
+  val chatQueue = runtime.chatQueue
   val pendingRunCount: StateFlow<Int> = runtime.pendingRunCount
 
   fun setForeground(value: Boolean) {
@@ -181,5 +182,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun sendChat(message: String, thinking: String, attachments: List<OutgoingAttachment>) {
     runtime.sendChat(message = message, thinking = thinking, attachments = attachments)
+  }
+
+  fun removeChatQueueItem(id: String) {
+    runtime.removeChatQueueItem(id)
   }
 }
