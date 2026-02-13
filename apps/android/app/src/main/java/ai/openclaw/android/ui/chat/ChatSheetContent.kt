@@ -38,6 +38,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val streamingAssistantText by viewModel.chatStreamingAssistantText.collectAsState()
   val pendingToolCalls by viewModel.chatPendingToolCalls.collectAsState()
   val sessions by viewModel.chatSessions.collectAsState()
+  val chatQueue by viewModel.chatQueue.collectAsState()
 
   LaunchedEffect(mainSessionKey) {
     viewModel.loadChat(mainSessionKey)
@@ -92,6 +93,7 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       errorText = errorText,
       attachments = attachments,
+      chatQueue = chatQueue,
       onPickImages = { pickImages.launch("image/*") },
       onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
       onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
@@ -114,6 +116,15 @@ fun ChatSheetContent(viewModel: MainViewModel) {
         viewModel.sendChat(message = text, thinking = thinkingLevel, attachments = outgoing)
         attachments.clear()
       },
+      onNewSession = {
+        viewModel.sendChat(message = "/new", thinking = "off", attachments = emptyList())
+        // Refresh sessions after a short delay to pick up the new one
+        scope.launch {
+          kotlinx.coroutines.delay(2000)
+          viewModel.refreshChatSessions(limit = 200)
+        }
+      },
+      onRemoveFromQueue = { id -> viewModel.removeChatQueueItem(id) },
     )
   }
 }

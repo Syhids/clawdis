@@ -1,15 +1,25 @@
 package ai.openclaw.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -27,17 +37,183 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatMessageContent
 import ai.openclaw.android.chat.ChatPendingToolCall
 import ai.openclaw.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+// ─── Grouped Message Views ──────────────────────────────────────────────────
+
+/**
+ * Renders a message group: stacked bubbles + footer (name · timestamp).
+ * Long-press on assistant messages copies raw markdown to clipboard.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ChatMessageGroupView(group: ChatListItem.MessageGroup) {
+  val isUser = group.role == "user"
+  val haptic = LocalHapticFeedback.current
+  val context = LocalContext.current
+
+  // Extract raw markdown text from all messages in group
+  val rawMarkdown = remember(group.messages) {
+    group.messages.flatMap { msg ->
+      msg.content.filter { it.type == "text" }.mapNotNull { it.text }
+    }.joinToString("\n\n")
+  }
+
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+    verticalAlignment = Alignment.Bottom,
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth(0.85f)
+        .then(
+          if (rawMarkdown.isNotBlank()) {
+            Modifier.combinedClickable(
+              onClick = {},
+              onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("message", rawMarkdown))
+                Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+              },
+            )
+          } else {
+            Modifier
+          },
+        ),
+      horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+    ) {
+      // Stacked message bubbles
+      for ((index, message) in group.messages.withIndex()) {
+        if (index > 0) {
+          Spacer(modifier = Modifier.height(3.dp))
+        }
+        GroupedBubble(message = message, isUser = isUser)
+      }
+
+      // Footer: sender name · timestamp
+      Spacer(modifier = Modifier.height(4.dp))
+      GroupFooter(
+        role = group.role,
+        timestamp = group.timestamp,
+        isUser = isUser,
+      )
+    }
+  }
+}
+
+/**
+ * A single bubble within a group.
+ */
+@Composable
+private fun GroupedBubble(message: ChatMessage, isUser: Boolean) {
+  Surface(
+    shape = RoundedCornerShape(16.dp),
+    tonalElevation = 0.dp,
+    shadowElevation = 0.dp,
+    color = Color.Transparent,
+  ) {
+    Box(
+      modifier = Modifier
+        .background(bubbleBackground(isUser))
+        .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+      val textColor = textColorOverBubble(isUser)
+      ChatMessageBody(content = message.content, textColor = textColor)
+    }
+  }
+}
+
+/**
+ * Footer showing sender name and formatted timestamp.
+ * Format: "JARVIS · 14:30" or "You · 14:31"
+ */
+@Composable
+private fun GroupFooter(role: String, timestamp: Long?, isUser: Boolean) {
+  val senderName = if (isUser) "You" else "JARVIS"
+  val timeString = timestamp?.let { formatTimestamp(it) }
+
+  val label = if (timeString != null) {
+    "$senderName \u00B7 $timeString"
+  } else {
+    senderName
+  }
+
+  Text(
+    text = label,
+    style = MaterialTheme.typography.labelSmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.alpha(0.7f),
+  )
+}
+
+/**
+ * Streaming group: streaming bubble, displayed as assistant.
+ */
+@Composable
+fun ChatStreamingGroupView(text: String) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.Start,
+    verticalAlignment = Alignment.Bottom,
+  ) {
+    Column(modifier = Modifier.fillMaxWidth(0.85f)) {
+      Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+      ) {
+        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+          ChatMarkdown(text = text, textColor = MaterialTheme.colorScheme.onSurface)
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Typing indicator showing dot pulse + optional tool calls.
+ */
+@Composable
+fun ChatTypingGroupView(toolCalls: List<ChatPendingToolCall>) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.Start,
+    verticalAlignment = Alignment.Bottom,
+  ) {
+    Column(modifier = Modifier.fillMaxWidth(0.85f)) {
+      if (toolCalls.isNotEmpty()) {
+        ChatPendingToolsBubble(toolCalls = toolCalls)
+      } else {
+        ChatTypingIndicatorBubble()
+      }
+    }
+  }
+}
+
+// ─── Timestamp Formatting ───────────────────────────────────────────────────
+
+private fun formatTimestamp(timestampMs: Long): String {
+  val date = Date(timestampMs)
+  val format = SimpleDateFormat("HH:mm", Locale.getDefault())
+  return format.format(date)
+}
+
+// ─── Legacy Composables (kept for compatibility) ────────────────────────────
 
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
@@ -98,7 +274,7 @@ fun ChatTypingIndicatorBubble() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         DotPulse()
-        Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Thinking\u2026", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
   }
@@ -117,7 +293,7 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
       color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
       Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Running tools…", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text("Running tools\u2026", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
         for (display in displays.take(6)) {
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -138,7 +314,7 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
         }
         if (toolCalls.size > 6) {
           Text(
-            "… +${toolCalls.size - 6} more",
+            "\u2026 +${toolCalls.size - 6} more",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -227,11 +403,12 @@ private fun DotPulse() {
 
 @Composable
 private fun PulseDot(alpha: Float) {
-  Surface(
-    modifier = Modifier.size(6.dp).alpha(alpha),
-    shape = CircleShape,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  ) {}
+  Box(
+    modifier = Modifier
+      .size(6.dp)
+      .alpha(alpha)
+      .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
+  )
 }
 
 @Composable

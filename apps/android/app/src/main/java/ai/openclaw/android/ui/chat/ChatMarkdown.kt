@@ -20,21 +20,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
 fun ChatMarkdown(text: String, textColor: Color) {
   val blocks = remember(text) { splitMarkdown(text) }
-  val inlineCodeBg = MaterialTheme.colorScheme.surfaceContainerLow
 
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     for (b in blocks) {
@@ -42,10 +37,28 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.Text -> {
           val trimmed = b.text.trimEnd()
           if (trimmed.isEmpty()) continue
-          Text(
-            text = parseInlineMarkdown(trimmed, inlineCodeBg = inlineCodeBg),
-            style = MaterialTheme.typography.bodyMedium,
-            color = textColor,
+          Markdown(
+            content = trimmed,
+            colors = markdownColor(
+              text = textColor,
+              codeText = MaterialTheme.colorScheme.onSurface,
+              codeBackground = MaterialTheme.colorScheme.surfaceContainerLowest,
+              linkText = MaterialTheme.colorScheme.primary,
+              tableText = textColor,
+            ),
+            typography = markdownTypography(
+              text = MaterialTheme.typography.bodyMedium,
+              h1 = MaterialTheme.typography.headlineSmall,
+              h2 = MaterialTheme.typography.titleLarge,
+              h3 = MaterialTheme.typography.titleMedium,
+              h4 = MaterialTheme.typography.titleSmall,
+              h5 = MaterialTheme.typography.labelLarge,
+              h6 = MaterialTheme.typography.labelMedium,
+              paragraph = MaterialTheme.typography.bodyMedium,
+              ordered = MaterialTheme.typography.bodyMedium,
+              bullet = MaterialTheme.typography.bodyMedium,
+              list = MaterialTheme.typography.bodyMedium,
+            ),
           )
         }
         is ChatMarkdownBlock.Code -> {
@@ -123,57 +136,6 @@ private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
   }
 
   if (idx < text.length) out.add(ChatMarkdownBlock.Text(text.substring(idx)))
-  return out
-}
-
-private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.graphics.Color): AnnotatedString {
-  if (text.isEmpty()) return AnnotatedString("")
-
-  val out = buildAnnotatedString {
-    var i = 0
-    while (i < text.length) {
-      if (text.startsWith("**", startIndex = i)) {
-        val end = text.indexOf("**", startIndex = i + 2)
-        if (end > i + 2) {
-          withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
-            append(text.substring(i + 2, end))
-          }
-          i = end + 2
-          continue
-        }
-      }
-
-      if (text[i] == '`') {
-        val end = text.indexOf('`', startIndex = i + 1)
-        if (end > i + 1) {
-          withStyle(
-            SpanStyle(
-              fontFamily = FontFamily.Monospace,
-              background = inlineCodeBg,
-            ),
-          ) {
-            append(text.substring(i + 1, end))
-          }
-          i = end + 1
-          continue
-        }
-      }
-
-      if (text[i] == '*' && (i + 1 < text.length && text[i + 1] != '*')) {
-        val end = text.indexOf('*', startIndex = i + 1)
-        if (end > i + 1) {
-          withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-            append(text.substring(i + 1, end))
-          }
-          i = end + 1
-          continue
-        }
-      }
-
-      append(text[i])
-      i += 1
-    }
-  }
   return out
 }
 
