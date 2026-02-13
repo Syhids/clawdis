@@ -34,6 +34,7 @@ import androidx.compose.foundation.Image
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatMessageContent
 import ai.openclaw.android.chat.ChatPendingToolCall
+import ai.openclaw.android.chat.MessageCategory
 import ai.openclaw.android.tools.ToolDisplayRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,39 +43,87 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
   val isUser = message.role.lowercase() == "user"
+  val category = message.category
 
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-  ) {
-    Surface(
-      shape = RoundedCornerShape(16.dp),
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      color = Color.Transparent,
-      modifier = Modifier.fillMaxWidth(0.92f),
-    ) {
-      Box(
-        modifier =
-          Modifier
-            .background(bubbleBackground(isUser))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+  when (category) {
+    MessageCategory.SystemEvent -> {
+      // System events: compact, centered, muted style
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
       ) {
-        val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
+        Surface(
+          shape = RoundedCornerShape(12.dp),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+          modifier = Modifier.fillMaxWidth(0.85f),
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+          ) {
+            Text(
+              text = "⚡",
+              style = MaterialTheme.typography.labelSmall,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+              ChatMessageBody(
+                content = message.content,
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                textStyle = MaterialTheme.typography.bodySmall,
+              )
+            }
+          }
+        }
+      }
+    }
+    else -> {
+      // Normal user/assistant bubble
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+      ) {
+        Surface(
+          shape = RoundedCornerShape(16.dp),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          color = Color.Transparent,
+          modifier = Modifier.fillMaxWidth(0.92f),
+        ) {
+          Box(
+            modifier =
+              Modifier
+                .background(bubbleBackground(isUser))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+          ) {
+            val textColor = textColorOverBubble(isUser)
+            ChatMessageBody(content = message.content, textColor = textColor)
+          }
+        }
       }
     }
   }
 }
 
 @Composable
-private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color) {
+private fun ChatMessageBody(
+  content: List<ChatMessageContent>,
+  textColor: Color,
+  textStyle: androidx.compose.ui.text.TextStyle? = null,
+) {
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     for (part in content) {
       when (part.type) {
         "text" -> {
           val text = part.text ?: continue
-          ChatMarkdown(text = text, textColor = textColor)
+          if (textStyle != null) {
+            // For compact styles (system events), use plain Text instead of full markdown
+            Text(text = text, color = textColor, style = textStyle)
+          } else {
+            ChatMarkdown(text = text, textColor = textColor)
+          }
         }
         else -> {
           val b64 = part.base64 ?: continue
