@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatPendingToolCall
+import ai.openclaw.android.ui.chat.forms.FormResponse
 
 @Composable
 fun ChatMessageListCard(
@@ -29,6 +30,8 @@ fun ChatMessageListCard(
   pendingRunCount: Int,
   pendingToolCalls: List<ChatPendingToolCall>,
   streamingAssistantText: String?,
+  onFormSubmit: ((FormResponse) -> Unit)? = null,
+  submittedFormIds: Set<String> = emptySet(),
   modifier: Modifier = Modifier,
 ) {
   val listState = rememberLazyListState()
@@ -60,7 +63,11 @@ fun ChatMessageListCard(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp, start = 12.dp, end = 12.dp),
       ) {
         items(count = messages.size, key = { idx -> messages[idx].id }) { idx ->
-          ChatMessageBubble(message = messages[idx])
+          ChatMessageBubble(
+            message = messages[idx],
+            onFormSubmit = onFormSubmit,
+            submittedFormIds = submittedFormIds,
+          )
         }
 
         if (pendingRunCount > 0) {

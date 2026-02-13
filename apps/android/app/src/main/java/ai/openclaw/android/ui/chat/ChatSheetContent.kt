@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ai.openclaw.android.MainViewModel
 import ai.openclaw.android.chat.OutgoingAttachment
+import ai.openclaw.android.ui.chat.forms.FormResponseFormatter
+import ai.openclaw.android.ui.chat.forms.FormSubmissionManager
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +51,8 @@ fun ChatSheetContent(viewModel: MainViewModel) {
   val scope = rememberCoroutineScope()
 
   val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
+  val formSubmissionManager = remember { FormSubmissionManager() }
+  val submittedFormIds by formSubmissionManager.submittedForms.collectAsState()
 
   val pickImages =
     rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -80,6 +84,12 @@ fun ChatSheetContent(viewModel: MainViewModel) {
       pendingRunCount = pendingRunCount,
       pendingToolCalls = pendingToolCalls,
       streamingAssistantText = streamingAssistantText,
+      onFormSubmit = { response ->
+        formSubmissionManager.markSubmitted(response.formId)
+        val message = FormResponseFormatter.formatMessage(response)
+        viewModel.submitFormResponse(message)
+      },
+      submittedFormIds = submittedFormIds,
       modifier = Modifier.weight(1f, fill = true),
     )
 

@@ -35,12 +35,20 @@ import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatMessageContent
 import ai.openclaw.android.chat.ChatPendingToolCall
 import ai.openclaw.android.tools.ToolDisplayRegistry
+import ai.openclaw.android.ui.chat.forms.FormAction
+import ai.openclaw.android.ui.chat.forms.FormParser
+import ai.openclaw.android.ui.chat.forms.FormResponse
+import ai.openclaw.android.ui.chat.forms.InlineFormCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun ChatMessageBubble(message: ChatMessage) {
+fun ChatMessageBubble(
+  message: ChatMessage,
+  onFormSubmit: ((FormResponse) -> Unit)? = null,
+  submittedFormIds: Set<String> = emptySet(),
+) {
   val isUser = message.role.lowercase() == "user"
 
   Row(
@@ -61,20 +69,49 @@ fun ChatMessageBubble(message: ChatMessage) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
       ) {
         val textColor = textColorOverBubble(isUser)
-        ChatMessageBody(content = message.content, textColor = textColor)
+        ChatMessageBody(
+          content = message.content,
+          textColor = textColor,
+          onFormSubmit = onFormSubmit,
+          submittedFormIds = submittedFormIds,
+        )
       }
     }
   }
 }
 
 @Composable
-private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color) {
+private fun ChatMessageBody(
+  content: List<ChatMessageContent>,
+  textColor: Color,
+  onFormSubmit: ((FormResponse) -> Unit)? = null,
+  submittedFormIds: Set<String> = emptySet(),
+) {
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     for (part in content) {
       when (part.type) {
         "text" -> {
           val text = part.text ?: continue
           ChatMarkdown(text = text, textColor = textColor)
+        }
+        "inline_form" -> {
+          val form = FormParser.parse(part.text)
+          if (form != null && onFormSubmit != null) {
+            InlineFormCard(
+              form = form,
+              onSubmit = onFormSubmit,
+              onCancel = {
+                onFormSubmit(
+                  FormResponse(
+                    formId = form.formId,
+                    values = emptyMap(),
+                    action = FormAction.CANCEL,
+                  ),
+                )
+              },
+              isDisabled = form.formId in submittedFormIds,
+            )
+          }
         }
         else -> {
           val b64 = part.base64 ?: continue

@@ -110,6 +110,15 @@ class ChatController(
     scope.launch { bootstrap(forceHealth = true) }
   }
 
+  fun submitFormResponse(message: String) {
+    if (message.isBlank()) return
+    if (!_healthOk.value) {
+      _errorText.value = "Gateway health not OK; cannot send"
+      return
+    }
+    sendMessage(message = message, thinkingLevel = _thinkingLevel.value, attachments = emptyList())
+  }
+
   fun sendMessage(
     message: String,
     thinkingLevel: String,
@@ -467,10 +476,10 @@ class ChatController(
   private fun parseMessageContent(el: JsonElement): ChatMessageContent? {
     val obj = el.asObjectOrNull() ?: return null
     val type = obj["type"].asStringOrNull() ?: "text"
-    return if (type == "text") {
-      ChatMessageContent(type = "text", text = obj["text"].asStringOrNull())
-    } else {
-      ChatMessageContent(
+    return when (type) {
+      "text" -> ChatMessageContent(type = "text", text = obj["text"].asStringOrNull())
+      "inline_form" -> ChatMessageContent(type = "inline_form", text = obj["text"].asStringOrNull())
+      else -> ChatMessageContent(
         type = type,
         mimeType = obj["mimeType"].asStringOrNull(),
         fileName = obj["fileName"].asStringOrNull(),

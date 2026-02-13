@@ -769,6 +769,10 @@ class NodeRuntime(context: Context) {
     chat.sendMessage(message = message, thinkingLevel = thinking, attachments = attachments)
   }
 
+  fun submitFormResponse(message: String) {
+    chat.submitFormResponse(message = message)
+  }
+
   private fun handleGatewayEvent(event: String, payloadJson: String?) {
     if (event == "voicewake.changed") {
       if (payloadJson.isNullOrBlank()) return
