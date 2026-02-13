@@ -326,6 +326,16 @@ class ChatController(
 
     val state = payload["state"].asStringOrNull()
     when (state) {
+      "delta" -> {
+        val message = payload["message"].asObjectOrNull()
+        val next = extractTextFromMessage(message)
+        if (next != null) {
+          val current = _streamingAssistantText.value ?: ""
+          if (current.isEmpty() || next.length >= current.length) {
+            _streamingAssistantText.value = next
+          }
+        }
+      }
       "final", "aborted", "error" -> {
         if (state == "error") {
           _errorText.value = payload["errorMessage"].asStringOrNull() ?: "Chat failed"
@@ -526,3 +536,31 @@ private fun JsonElement?.asLongOrNull(): Long? =
     is JsonPrimitive -> content.toLongOrNull()
     else -> null
   }
+
+/**
+ * Extract text content from a chat event message payload.
+ * Handles both string content and array-of-blocks content formats.
+ */
+private fun extractTextFromMessage(message: JsonObject?): String? {
+  if (message == null) return null
+  val content = message["content"] ?: return null
+
+  // content is a string
+  if (content is JsonPrimitive) {
+    return content.content.takeIf { it.isNotEmpty() }
+  }
+
+  // content is an array of blocks
+  val array = content as? JsonArray ?: return null
+  val parts = array.mapNotNull { el ->
+    val obj = el as? JsonObject ?: return@mapNotNull null
+    val type = obj["type"]?.let { (it as? JsonPrimitive)?.content } ?: "text"
+    if (type == "text") {
+      (obj["text"] as? JsonPrimitive)?.content
+    } else {
+      null
+    }
+  }
+  if (parts.isEmpty()) return null
+  return parts.joinToString("\n").takeIf { it.isNotEmpty() }
+}
