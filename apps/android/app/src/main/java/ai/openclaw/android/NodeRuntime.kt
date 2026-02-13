@@ -26,11 +26,14 @@ import ai.openclaw.android.BuildConfig
 import ai.openclaw.android.node.CanvasController
 import ai.openclaw.android.node.ScreenRecordManager
 import ai.openclaw.android.node.SmsManager
+import ai.openclaw.android.intent.IntentBridgeManager
+import ai.openclaw.android.intent.PendingIntentConfirmation
 import ai.openclaw.android.protocol.OpenClawCapability
 import ai.openclaw.android.protocol.OpenClawCameraCommand
 import ai.openclaw.android.protocol.OpenClawCanvasA2UIAction
 import ai.openclaw.android.protocol.OpenClawCanvasA2UICommand
 import ai.openclaw.android.protocol.OpenClawCanvasCommand
+import ai.openclaw.android.protocol.OpenClawIntentCommand
 import ai.openclaw.android.protocol.OpenClawScreenCommand
 import ai.openclaw.android.protocol.OpenClawLocationCommand
 import ai.openclaw.android.protocol.OpenClawSmsCommand
@@ -69,6 +72,7 @@ class NodeRuntime(context: Context) {
   val location = LocationCaptureManager(appContext)
   val screenRecorder = ScreenRecordManager(appContext)
   val sms = SmsManager(appContext)
+  val intentBridge = IntentBridgeManager(appContext, prefs)
   private val json = Json { ignoreUnknownKeys = true }
 
   private val externalAudioCaptureActive = MutableStateFlow(false)
@@ -281,6 +285,7 @@ class NodeRuntime(context: Context) {
   val wakeWords: StateFlow<List<String>> = prefs.wakeWords
   val voiceWakeMode: StateFlow<VoiceWakeMode> = prefs.voiceWakeMode
   val talkEnabled: StateFlow<Boolean> = prefs.talkEnabled
+  val intentBridgeEnabled: StateFlow<Boolean> = prefs.intentBridgeEnabled
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
@@ -468,6 +473,23 @@ class NodeRuntime(context: Context) {
     prefs.setTalkEnabled(value)
   }
 
+  fun setIntentBridgeEnabled(value: Boolean) {
+    prefs.setIntentBridgeEnabled(value)
+  }
+
+  val pendingIntentConfirmation: StateFlow<PendingIntentConfirmation?> =
+    intentBridge.pendingConfirmation
+
+  val intentWhitelistSize: StateFlow<Int>
+    get() {
+      val size = intentBridge.securityPolicy.loadUserWhitelist().size
+      return MutableStateFlow(size)
+    }
+
+  fun clearIntentWhitelist() {
+    intentBridge.securityPolicy.clearWhitelist()
+  }
+
   private fun buildInvokeCommands(): List<String> =
     buildList {
       add(OpenClawCanvasCommand.Present.rawValue)
@@ -489,6 +511,12 @@ class NodeRuntime(context: Context) {
       if (sms.canSendSms()) {
         add(OpenClawSmsCommand.Send.rawValue)
       }
+      if (intentBridgeEnabled.value) {
+        add(OpenClawIntentCommand.Launch.rawValue)
+        add(OpenClawIntentCommand.Query.rawValue)
+        add(OpenClawIntentCommand.Apps.rawValue)
+        add(OpenClawIntentCommand.Share.rawValue)
+      }
     }
 
   private fun buildCapabilities(): List<String> =
@@ -502,6 +530,9 @@ class NodeRuntime(context: Context) {
       }
       if (locationMode.value != LocationMode.Off) {
         add(OpenClawCapability.Location.rawValue)
+      }
+      if (intentBridgeEnabled.value) {
+        add(OpenClawCapability.Intent.rawValue)
       }
     }
 
@@ -872,6 +903,14 @@ class NodeRuntime(context: Context) {
         message = "LOCATION_DISABLED: enable Location in Settings",
       )
     }
+    if (command.startsWith(OpenClawIntentCommand.NamespacePrefix) &&
+      !intentBridgeEnabled.value
+    ) {
+      return GatewaySession.InvokeResult.error(
+        code = "INTENT_DISABLED",
+        message = "INTENT_DISABLED: enable Intent Bridge in Settings",
+      )
+    }
 
     return when (command) {
       OpenClawCanvasCommand.Present.rawValue -> {
@@ -1071,6 +1110,22 @@ class NodeRuntime(context: Context) {
           val code = if (idx > 0) error.substring(0, idx).trim() else "SMS_SEND_FAILED"
           GatewaySession.InvokeResult.error(code = code, message = error)
         }
+      }
+      OpenClawIntentCommand.Launch.rawValue -> {
+        val resultJson = intentBridge.handleLaunch(paramsJson)
+        GatewaySession.InvokeResult.ok(resultJson)
+      }
+      OpenClawIntentCommand.Query.rawValue -> {
+        val resultJson = intentBridge.handleQuery(paramsJson)
+        GatewaySession.InvokeResult.ok(resultJson)
+      }
+      OpenClawIntentCommand.Apps.rawValue -> {
+        val resultJson = intentBridge.handleApps(paramsJson)
+        GatewaySession.InvokeResult.ok(resultJson)
+      }
+      OpenClawIntentCommand.Share.rawValue -> {
+        val resultJson = intentBridge.handleShare(paramsJson)
+        GatewaySession.InvokeResult.ok(resultJson)
       }
       else ->
         GatewaySession.InvokeResult.error(

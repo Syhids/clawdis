@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
     viewModel.sms.attachPermissionRequester(permissionRequester)
     viewModel.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
     viewModel.screenRecorder.attachPermissionRequester(permissionRequester)
+    viewModel.intentBridge.attachActivityLauncher { intent -> startActivity(intent) }
 
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onStop() {
     viewModel.setForeground(false)
+    viewModel.intentBridge.detachActivityLauncher()
     super.onStop()
   }
 

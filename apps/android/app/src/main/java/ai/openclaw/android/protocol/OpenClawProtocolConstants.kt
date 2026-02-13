@@ -7,6 +7,7 @@ enum class OpenClawCapability(val rawValue: String) {
   Sms("sms"),
   VoiceWake("voiceWake"),
   Location("location"),
+  Intent("intent"),
 }
 
 enum class OpenClawCanvasCommand(val rawValue: String) {
