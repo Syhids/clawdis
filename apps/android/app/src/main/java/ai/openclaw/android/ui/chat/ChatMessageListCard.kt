@@ -82,7 +82,7 @@ fun ChatMessageListCard(
   LaunchedEffect(items.size, streamingAssistantText) {
     if (items.isEmpty()) return@LaunchedEffect
     if (isNearBottom) {
-      listState.scrollToItem(index = items.size - 1)
+      listState.animateScrollToItem(index = items.size - 1)
       showNewMessagesIndicator = false
     } else {
       showNewMessagesIndicator = true
@@ -148,7 +148,7 @@ fun ChatMessageListCard(
             showNewMessagesIndicator = false
             coroutineScope.launch {
               if (items.isNotEmpty()) {
-                listState.scrollToItem(index = items.size - 1)
+                listState.animateScrollToItem(index = items.size - 1)
               }
             }
           },
