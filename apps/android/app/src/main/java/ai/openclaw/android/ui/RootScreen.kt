@@ -210,7 +210,7 @@ fun RootScreen(viewModel: MainViewModel) {
     ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
       PackageManager.PERMISSION_GRANTED
 
-  Box(modifier = Modifier.fillMaxSize()) {
+  Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
     CanvasView(viewModel = viewModel, modifier = Modifier.fillMaxSize())
   }
 
