@@ -43,6 +43,8 @@ const SYSTEM_COMMANDS = ["system.run", "system.which", "system.notify", "browser
 
 // "High risk" node commands. These can be enabled by explicitly adding them to
 // `gateway.nodes.allowCommands` (and ensuring they're not blocked by denyCommands).
+const APP_DANGEROUS_COMMANDS = ["app.update"];
+
 export const DEFAULT_DANGEROUS_NODE_COMMANDS = [
   ...CAMERA_DANGEROUS_COMMANDS,
   ...SCREEN_DANGEROUS_COMMANDS,
@@ -50,6 +52,7 @@ export const DEFAULT_DANGEROUS_NODE_COMMANDS = [
   ...CALENDAR_DANGEROUS_COMMANDS,
   ...REMINDERS_DANGEROUS_COMMANDS,
   ...SMS_DANGEROUS_COMMANDS,
+  ...APP_DANGEROUS_COMMANDS,
 ];
 
 const PLATFORM_DEFAULTS: Record<string, string[]> = {
