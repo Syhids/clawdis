@@ -3,12 +3,22 @@ package ai.openclaw.android.ui.chat
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -26,6 +37,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +68,9 @@ fun ChatMarkdown(text: String, textColor: Color) {
         is ChatMarkdownBlock.InlineImage -> {
           InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
         }
+        is ChatMarkdownBlock.Table -> {
+          ChatTable(table = b, textColor = textColor, inlineCodeBg = inlineCodeBg)
+        }
       }
     }
   }
@@ -65,7 +80,10 @@ private sealed interface ChatMarkdownBlock {
   data class Text(val text: String) : ChatMarkdownBlock
   data class Code(val code: String, val language: String?) : ChatMarkdownBlock
   data class InlineImage(val mimeType: String?, val base64: String) : ChatMarkdownBlock
+  data class Table(val headers: List<String>, val rows: List<List<String>>, val alignments: List<TableAlignment>) : ChatMarkdownBlock
 }
+
+enum class TableAlignment { Left, Center, Right }
 
 private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
   if (raw.isEmpty()) return emptyList()
@@ -75,12 +93,12 @@ private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
   while (idx < raw.length) {
     val fenceStart = raw.indexOf("```", startIndex = idx)
     if (fenceStart < 0) {
-      out.addAll(splitInlineImages(raw.substring(idx)))
+      out.addAll(splitTablesAndImages(raw.substring(idx)))
       break
     }
 
     if (fenceStart > idx) {
-      out.addAll(splitInlineImages(raw.substring(idx, fenceStart)))
+      out.addAll(splitTablesAndImages(raw.substring(idx, fenceStart)))
     }
 
     val langLineStart = fenceStart + 3
@@ -90,7 +108,7 @@ private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
     val codeStart = if (langLineEnd < raw.length && raw[langLineEnd] == '\n') langLineEnd + 1 else langLineEnd
     val fenceEnd = raw.indexOf("```", startIndex = codeStart)
     if (fenceEnd < 0) {
-      out.addAll(splitInlineImages(raw.substring(fenceStart)))
+      out.addAll(splitTablesAndImages(raw.substring(fenceStart)))
       break
     }
     val code = raw.substring(codeStart, fenceEnd)
@@ -100,6 +118,102 @@ private fun splitMarkdown(raw: String): List<ChatMarkdownBlock> {
   }
 
   return out
+}
+
+private fun splitTablesAndImages(text: String): List<ChatMarkdownBlock> {
+  if (text.isEmpty()) return emptyList()
+
+  val lines = text.lines()
+  val out = ArrayList<ChatMarkdownBlock>()
+  var textBuffer = StringBuilder()
+  var i = 0
+
+  while (i < lines.size) {
+    val line = lines[i]
+
+    // Check if this could be the start of a table (header row)
+    if (line.contains('|') && i + 1 < lines.size) {
+      val separatorLine = lines[i + 1]
+      if (isTableSeparator(separatorLine)) {
+        // Flush text buffer
+        if (textBuffer.isNotEmpty()) {
+          out.addAll(splitInlineImages(textBuffer.toString()))
+          textBuffer = StringBuilder()
+        }
+
+        // Parse table
+        val headerCells = parseTableRow(line)
+        val alignments = parseAlignments(separatorLine, headerCells.size)
+
+        val rows = ArrayList<List<String>>()
+        var j = i + 2
+        while (j < lines.size && lines[j].contains('|')) {
+          val rowCells = parseTableRow(lines[j])
+          if (rowCells.isNotEmpty()) {
+            // Pad or trim to match header count
+            val normalizedRow = (0 until headerCells.size).map { idx ->
+              rowCells.getOrElse(idx) { "" }
+            }
+            rows.add(normalizedRow)
+          }
+          j++
+        }
+
+        out.add(ChatMarkdownBlock.Table(headers = headerCells, rows = rows, alignments = alignments))
+        i = j
+        continue
+      }
+    }
+
+    // Regular line
+    if (textBuffer.isNotEmpty()) textBuffer.append("\n")
+    textBuffer.append(line)
+    i++
+  }
+
+  if (textBuffer.isNotEmpty()) {
+    out.addAll(splitInlineImages(textBuffer.toString()))
+  }
+
+  return out
+}
+
+private fun isTableSeparator(line: String): Boolean {
+  val trimmed = line.trim()
+  if (!trimmed.contains('|')) return false
+
+  // Separator line should only contain |, -, :, and spaces
+  val separatorChars = setOf('|', '-', ':', ' ')
+  if (!trimmed.all { it in separatorChars }) return false
+
+  // Should have at least one dash
+  return trimmed.contains('-')
+}
+
+private fun parseTableRow(line: String): List<String> {
+  val trimmed = line.trim()
+
+  // Remove leading/trailing pipes if present
+  val content = when {
+    trimmed.startsWith('|') && trimmed.endsWith('|') -> trimmed.substring(1, trimmed.length - 1)
+    trimmed.startsWith('|') -> trimmed.substring(1)
+    trimmed.endsWith('|') -> trimmed.substring(0, trimmed.length - 1)
+    else -> trimmed
+  }
+
+  return content.split('|').map { it.trim() }
+}
+
+private fun parseAlignments(separatorLine: String, columnCount: Int): List<TableAlignment> {
+  val cells = parseTableRow(separatorLine)
+  return (0 until columnCount).map { idx ->
+    val cell = cells.getOrElse(idx) { "" }.trim()
+    when {
+      cell.startsWith(':') && cell.endsWith(':') -> TableAlignment.Center
+      cell.endsWith(':') -> TableAlignment.Right
+      else -> TableAlignment.Left
+    }
+  }
 }
 
 private fun splitInlineImages(text: String): List<ChatMarkdownBlock> {
@@ -175,6 +289,100 @@ private fun parseInlineMarkdown(text: String, inlineCodeBg: androidx.compose.ui.
     }
   }
   return out
+}
+
+@Composable
+private fun ChatTable(
+  table: ChatMarkdownBlock.Table,
+  textColor: Color,
+  inlineCodeBg: Color,
+) {
+  val headerBg = MaterialTheme.colorScheme.surfaceContainerHigh
+  val rowBg = MaterialTheme.colorScheme.surfaceContainerLow
+  val altRowBg = MaterialTheme.colorScheme.surfaceContainer
+  val borderColor = MaterialTheme.colorScheme.outlineVariant
+
+  Surface(
+    shape = RoundedCornerShape(8.dp),
+    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Box(
+      modifier = Modifier
+        .horizontalScroll(rememberScrollState())
+        .clip(RoundedCornerShape(8.dp))
+    ) {
+      Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+        // Header row
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(headerBg)
+            .padding(horizontal = 1.dp)
+        ) {
+          table.headers.forEachIndexed { idx, header ->
+            val alignment = table.alignments.getOrElse(idx) { TableAlignment.Left }
+            Box(
+              modifier = Modifier
+                .weight(1f, fill = false)
+                .width(IntrinsicSize.Max)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+              Text(
+                text = parseInlineMarkdown(header, inlineCodeBg = inlineCodeBg),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor,
+                textAlign = alignment.toTextAlign(),
+                modifier = Modifier.fillMaxWidth(),
+              )
+            }
+          }
+        }
+
+        HorizontalDivider(color = borderColor, thickness = 1.dp)
+
+        // Data rows
+        table.rows.forEachIndexed { rowIdx, row ->
+          val bg = if (rowIdx % 2 == 0) rowBg else altRowBg
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .background(bg)
+              .padding(horizontal = 1.dp)
+          ) {
+            row.forEachIndexed { cellIdx, cell ->
+              val alignment = table.alignments.getOrElse(cellIdx) { TableAlignment.Left }
+              Box(
+                modifier = Modifier
+                  .weight(1f, fill = false)
+                  .width(IntrinsicSize.Max)
+                  .padding(horizontal = 10.dp, vertical = 6.dp)
+              ) {
+                Text(
+                  text = parseInlineMarkdown(cell, inlineCodeBg = inlineCodeBg),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = textColor,
+                  textAlign = alignment.toTextAlign(),
+                  modifier = Modifier.fillMaxWidth(),
+                )
+              }
+            }
+          }
+
+          if (rowIdx < table.rows.size - 1) {
+            HorizontalDivider(color = borderColor.copy(alpha = 0.5f), thickness = 0.5.dp)
+          }
+        }
+      }
+    }
+  }
+}
+
+private fun TableAlignment.toTextAlign(): TextAlign = when (this) {
+  TableAlignment.Left -> TextAlign.Start
+  TableAlignment.Center -> TextAlign.Center
+  TableAlignment.Right -> TextAlign.End
 }
 
 @Composable
