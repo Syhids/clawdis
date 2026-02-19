@@ -2,6 +2,12 @@ package ai.openclaw.android.ui.chat
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -229,10 +235,25 @@ private fun ChatBase64Image(base64: String, mimeType: String?) {
 
 @Composable
 private fun DotPulse() {
+  val infiniteTransition = rememberInfiniteTransition(label = "dotPulse")
+  // Phase cycles from 0 to 3 over 1200ms (400ms per dot)
+  val phase by infiniteTransition.animateFloat(
+    initialValue = 0f,
+    targetValue = 3f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(durationMillis = 1200, easing = LinearEasing),
+      repeatMode = RepeatMode.Restart,
+    ),
+    label = "phase",
+  )
+
   Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-    PulseDot(alpha = 0.38f)
-    PulseDot(alpha = 0.62f)
-    PulseDot(alpha = 0.90f)
+    for (i in 0 until 3) {
+      // Each dot gets brighter when phase is near its index
+      val distance = kotlin.math.abs(phase - i.toFloat()).coerceAtMost(1f)
+      val alpha = 1f - (distance * 0.6f) // Ranges from 0.4 (far) to 1.0 (active)
+      PulseDot(alpha = alpha)
+    }
   }
 }
 
