@@ -36,25 +36,25 @@ fun ChatMarkdown(text: String, textColor: Color) {
   val blocks = remember(text) { splitMarkdown(text) }
   val inlineCodeBg = MaterialTheme.colorScheme.surfaceContainerLow
 
-  Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    for (b in blocks) {
-      when (b) {
-        is ChatMarkdownBlock.Text -> {
-          val trimmed = b.text.trimEnd()
-          if (trimmed.isEmpty()) continue
-          Text(
-            text = parseInlineMarkdown(trimmed, inlineCodeBg = inlineCodeBg),
-            style = MaterialTheme.typography.bodyMedium,
-            color = textColor,
-          )
-        }
-        is ChatMarkdownBlock.Code -> {
-          SelectionContainer(modifier = Modifier.fillMaxWidth()) {
+  SelectionContainer {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      for (b in blocks) {
+        when (b) {
+          is ChatMarkdownBlock.Text -> {
+            val trimmed = b.text.trimEnd()
+            if (trimmed.isEmpty()) continue
+            Text(
+              text = parseInlineMarkdown(trimmed, inlineCodeBg = inlineCodeBg),
+              style = MaterialTheme.typography.bodyMedium,
+              color = textColor,
+            )
+          }
+          is ChatMarkdownBlock.Code -> {
             ChatCodeBlock(code = b.code, language = b.language)
           }
-        }
-        is ChatMarkdownBlock.InlineImage -> {
-          InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
+          is ChatMarkdownBlock.InlineImage -> {
+            InlineBase64Image(base64 = b.base64, mimeType = b.mimeType)
+          }
         }
       }
     }
