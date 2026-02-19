@@ -67,6 +67,8 @@ fun ChatComposer(
   val currentSessionLabel = friendlySessionName(
     sessionOptions.firstOrNull { it.key == sessionKey }?.displayName ?: sessionKey
   )
+  val sessionCount = sessionOptions.size
+  val sessionButtonLabel = if (sessionCount >= 2) "$currentSessionLabel ($sessionCount)" else currentSessionLabel
 
   val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
 
@@ -87,7 +89,7 @@ fun ChatComposer(
             onClick = { showSessionMenu = true },
             contentPadding = ButtonDefaults.ContentPadding,
           ) {
-            Text(currentSessionLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sessionButtonLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
           }
 
           DropdownMenu(expanded = showSessionMenu, onDismissRequest = { showSessionMenu = false }) {
