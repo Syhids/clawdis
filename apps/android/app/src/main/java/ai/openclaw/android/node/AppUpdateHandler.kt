@@ -254,6 +254,15 @@ class AppUpdateHandler(
             android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
           )
           params.setSize(file.length())
+          // Allow version downgrades (INSTALL_REQUEST_DOWNGRADE = 0x80)
+          try {
+            val field = android.content.pm.PackageInstaller.SessionParams::class.java
+              .getDeclaredField("installFlags")
+            field.isAccessible = true
+            field.setInt(params, field.getInt(params) or 0x00000080)
+          } catch (e: Throwable) {
+            android.util.Log.w("openclaw", "app.update: could not set downgrade flag: ${e.message}")
+          }
           val sessionId = installer.createSession(params)
           val session = installer.openSession(sessionId)
           session.openWrite("openclaw-update.apk", 0, file.length()).use { out ->
