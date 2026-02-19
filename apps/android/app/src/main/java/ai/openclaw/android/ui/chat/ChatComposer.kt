@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +37,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import ai.openclaw.android.chat.ChatSessionEntry
 
 @Composable
@@ -51,6 +55,7 @@ fun ChatComposer(
   pendingRunCount: Int,
   errorText: String?,
   attachments: List<PendingImageAttachment>,
+  requestFocus: Boolean = false,
   onPickImages: () -> Unit,
   onRemoveAttachment: (id: String) -> Unit,
   onSetThinkingLevel: (level: String) -> Unit,
@@ -62,6 +67,19 @@ fun ChatComposer(
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
   var showSessionMenu by remember { mutableStateOf(false) }
+  val focusRequester = remember { FocusRequester() }
+
+  // Request focus when the sheet opens (with a small delay for animation)
+  LaunchedEffect(requestFocus) {
+    if (requestFocus) {
+      delay(150) // Let the sheet animation settle
+      try {
+        focusRequester.requestFocus()
+      } catch (_: Throwable) {
+        // Ignore if the composable is not attached
+      }
+    }
+  }
 
   val sessionOptions = resolveSessionChoices(sessionKey, sessions, mainSessionKey = mainSessionKey)
   val currentSessionLabel = friendlySessionName(
@@ -142,7 +160,7 @@ fun ChatComposer(
       OutlinedTextField(
         value = input,
         onValueChange = { input = it },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
         placeholder = { Text("Message OpenClaw…") },
         minLines = 2,
         maxLines = 6,
