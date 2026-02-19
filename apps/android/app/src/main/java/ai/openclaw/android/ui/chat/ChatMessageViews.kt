@@ -122,36 +122,53 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
     remember(toolCalls, context) {
       toolCalls.map { ToolDisplayRegistry.resolve(context, it.name, it.args) }
     }
+  val errorColor = Color(0xFFE74C3C)
+  val hasErrors = toolCalls.any { it.isError == true }
+
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
     Surface(
       shape = RoundedCornerShape(16.dp),
       color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
       Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Running tools…", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-        for (display in displays.take(6)) {
+        Text(
+          if (hasErrors) "Running tools… (errors)" else "Running tools…",
+          style = MaterialTheme.typography.labelLarge,
+          color = if (hasErrors) errorColor else MaterialTheme.colorScheme.onSurface,
+        )
+        for ((index, display) in displays.take(6).withIndex()) {
+          val toolCall = toolCalls.getOrNull(index)
+          val isError = toolCall?.isError == true
+          val textColor = if (isError) errorColor else MaterialTheme.colorScheme.onSurfaceVariant
+
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-              "${display.emoji} ${display.label}",
+              "${display.emoji} ${display.label}${if (isError) " ✗" else ""}",
               style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              color = textColor,
               fontFamily = FontFamily.Monospace,
             )
             display.detailLine?.let { detail ->
               Text(
                 detail,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = textColor,
                 fontFamily = FontFamily.Monospace,
               )
             }
           }
         }
         if (toolCalls.size > 6) {
+          val hiddenErrors = toolCalls.drop(6).count { it.isError == true }
+          val moreText = if (hiddenErrors > 0) {
+            "… +${toolCalls.size - 6} more ($hiddenErrors errors)"
+          } else {
+            "… +${toolCalls.size - 6} more"
+          }
           Text(
-            "… +${toolCalls.size - 6} more",
+            moreText,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (hiddenErrors > 0) errorColor else MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       }
