@@ -30,8 +30,8 @@ fun TalkFloatingMessage(
 ) {
   AnimatedVisibility(
     visible = !message.isNullOrBlank(),
-    enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-    exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+    enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+    exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
     modifier = modifier,
   ) {
     val displayText = message?.let {

@@ -322,32 +322,29 @@ fun RootScreen(viewModel: MainViewModel) {
 
   if (talkEnabled) {
     Popup(alignment = Alignment.Center, properties = PopupProperties(focusable = false)) {
-      TalkOrbOverlay(
-        seamColor = seamColor,
-        statusText = talkStatusText,
-        isListening = talkIsListening,
-        isSpeaking = talkIsSpeaking,
-      )
-    }
+      val floatingMsg by viewModel.floatingMessage.collectAsState()
+      val floatingEnabled by viewModel.floatingMessagesEnabled.collectAsState()
 
-    // Floating message toast — show below orb when talk mode is active
-    val floatingMsg by viewModel.floatingMessage.collectAsState()
-    val floatingEnabled by viewModel.floatingMessagesEnabled.collectAsState()
-
-    if (floatingEnabled) {
-      Popup(alignment = Alignment.BottomCenter, properties = PopupProperties(focusable = false)) {
-        TalkFloatingMessage(
-          message = floatingMsg,
-          unreadCount = unreadMessages,
-          onTap = {
-            viewModel.clearFloatingMessage()
-            viewModel.clearUnread()
-            sheet = Sheet.Chat
-          },
-          modifier = Modifier
-            .windowInsetsPadding(safeBottomInsets)
-            .padding(bottom = 88.dp),
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        TalkOrbOverlay(
+          seamColor = seamColor,
+          statusText = talkStatusText,
+          isListening = talkIsListening,
+          isSpeaking = talkIsSpeaking,
         )
+
+        if (floatingEnabled) {
+          TalkFloatingMessage(
+            message = floatingMsg,
+            unreadCount = unreadMessages,
+            onTap = {
+              viewModel.clearFloatingMessage()
+              viewModel.clearUnread()
+              sheet = Sheet.Chat
+            },
+            modifier = Modifier.padding(horizontal = 24.dp),
+          )
+        }
       }
     }
   }
