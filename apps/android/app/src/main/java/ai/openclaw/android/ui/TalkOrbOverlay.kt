@@ -32,6 +32,7 @@ fun TalkOrbOverlay(
   statusText: String,
   isListening: Boolean,
   isSpeaking: Boolean,
+  hasPendingToolCalls: Boolean = false,
   modifier: Modifier = Modifier,
 ) {
   val transition = rememberInfiniteTransition(label = "talk-orb")
@@ -107,6 +108,14 @@ fun TalkOrbOverlay(
           style = Stroke(width = 1.dp.toPx()),
         )
       }
+
+      OrbEmojiLayer(
+        isListening = isListening,
+        isSpeaking = isSpeaking,
+        hasPendingToolCalls = hasPendingToolCalls,
+        statusText = statusText,
+        modifier = Modifier.size(360.dp),
+      )
     }
 
     if (showStatus) {
