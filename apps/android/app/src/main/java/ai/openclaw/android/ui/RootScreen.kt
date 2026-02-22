@@ -104,6 +104,7 @@ fun RootScreen(viewModel: MainViewModel) {
   val seamColorArgb by viewModel.seamColorArgb.collectAsState()
   val seamColor = remember(seamColorArgb) { ComposeColor(seamColorArgb) }
   val unreadMessages by viewModel.unreadMessages.collectAsState()
+  val chatPendingToolCalls by viewModel.chatPendingToolCalls.collectAsState()
   val audioPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
       if (granted) viewModel.setTalkEnabled(true)
@@ -326,6 +327,7 @@ fun RootScreen(viewModel: MainViewModel) {
         statusText = talkStatusText,
         isListening = talkIsListening,
         isSpeaking = talkIsSpeaking,
+        hasPendingToolCalls = chatPendingToolCalls.isNotEmpty(),
       )
     }
   }
