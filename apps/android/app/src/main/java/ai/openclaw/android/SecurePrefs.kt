@@ -212,6 +212,14 @@ class SecurePrefs(context: Context) {
     prefs.edit { putString(key, value) }
   }
 
+  fun getBoolean(key: String, default: Boolean): Boolean {
+    return prefs.getBoolean(key, default)
+  }
+
+  fun putBoolean(key: String, value: Boolean) {
+    prefs.edit { putBoolean(key, value) }
+  }
+
   fun remove(key: String) {
     prefs.edit { remove(key) }
   }

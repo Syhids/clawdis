@@ -93,6 +93,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val discoveryStatusText by viewModel.discoveryStatusText.collectAsState()
   val pendingTrust by viewModel.pendingGatewayTrust.collectAsState()
 
+  val floatingMessagesEnabled by viewModel.floatingMessagesEnabled.collectAsState()
   val listState = rememberLazyListState()
   val (wakeWordsText, setWakeWordsText) = remember { mutableStateOf("") }
   val (advancedExpanded, setAdvancedExpanded) = remember { mutableStateOf(false) }
@@ -561,6 +562,18 @@ fun SettingsSheet(viewModel: MainViewModel) {
           "Connect to a gateway to sync wake words globally."
         },
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    item {
+      ListItem(
+        headlineContent = { Text("Show Floating Messages") },
+        supportingContent = { Text("Show assistant messages as floating toasts in Talk Mode.") },
+        trailingContent = {
+          Switch(
+            checked = floatingMessagesEnabled,
+            onCheckedChange = viewModel::setFloatingMessagesEnabled,
+          )
+        },
       )
     }
 
