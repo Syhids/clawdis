@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import ai.openclaw.android.ui.seasonal.SeasonalEffect
 import java.util.UUID
 
 class SecurePrefs(context: Context) {
@@ -93,6 +94,10 @@ class SecurePrefs(context: Context) {
 
   private val _talkEnabled = MutableStateFlow(prefs.getBoolean("talk.enabled", false))
   val talkEnabled: StateFlow<Boolean> = _talkEnabled
+
+  private val _seasonalEffect =
+    MutableStateFlow(SeasonalEffect.fromRawValue(prefs.getString("seasonal.effect", "auto")))
+  val seasonalEffect: StateFlow<SeasonalEffect> = _seasonalEffect
 
   fun setLastDiscoveredStableId(value: String) {
     val trimmed = value.trim()
@@ -261,6 +266,11 @@ class SecurePrefs(context: Context) {
   fun setTalkEnabled(value: Boolean) {
     prefs.edit { putBoolean("talk.enabled", value) }
     _talkEnabled.value = value
+  }
+
+  fun setSeasonalEffect(effect: SeasonalEffect) {
+    prefs.edit { putString("seasonal.effect", effect.rawValue) }
+    _seasonalEffect.value = effect
   }
 
   private fun loadVoiceWakeMode(): VoiceWakeMode {

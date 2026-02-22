@@ -694,6 +694,17 @@ fun SettingsSheet(viewModel: MainViewModel) {
 
     item { HorizontalDivider() }
 
+    // Seasonal Effects
+    item {
+      val seasonalEffect by viewModel.seasonalEffect.collectAsState()
+      ai.openclaw.android.ui.seasonal.SeasonalSettingsSection(
+        selected = seasonalEffect,
+        onSelect = viewModel::setSeasonalEffect,
+      )
+    }
+
+    item { HorizontalDivider() }
+
     // Debug
     item { Text("Debug", style = MaterialTheme.typography.titleSmall) }
     item {

@@ -330,6 +330,17 @@ fun RootScreen(viewModel: MainViewModel) {
     }
   }
 
+  // Seasonal particle effects overlay (non-interactive, renders above canvas)
+  val seasonalPref by viewModel.seasonalEffect.collectAsState()
+  val resolvedSeason = remember(seasonalPref) {
+    ai.openclaw.android.ui.seasonal.SeasonalEffect.resolveEffect(seasonalPref)
+  }
+  if (resolvedSeason != null) {
+    Popup(alignment = Alignment.Center, properties = PopupProperties(focusable = false)) {
+      ai.openclaw.android.ui.seasonal.SeasonalParticleOverlay(effect = resolvedSeason)
+    }
+  }
+
   val currentSheet = sheet
   if (currentSheet != null) {
     ModalBottomSheet(
