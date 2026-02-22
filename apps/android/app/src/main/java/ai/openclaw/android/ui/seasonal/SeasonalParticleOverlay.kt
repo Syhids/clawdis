@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withFrameNanos
 import kotlin.math.sin
 import kotlin.random.Random
 
