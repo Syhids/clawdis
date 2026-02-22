@@ -280,7 +280,12 @@ class NodeRuntime(context: Context) {
       session = operatorSession,
       json = json,
       supportsChatSubscribe = false,
-      onNewAssistantMessage = { _unreadChatMessages.value++ },
+      onNewAssistantMessage = { text ->
+        _unreadChatMessages.value++
+        if (talkEnabled.value && _floatingMessagesEnabled.value) {
+          _floatingMessage.value = text
+        }
+      },
     )
   private val talkMode: TalkModeManager by lazy {
     TalkModeManager(
@@ -353,6 +358,21 @@ class NodeRuntime(context: Context) {
   // Unread message counter — incremented by ChatController on new assistant messages
   private val _unreadChatMessages = MutableStateFlow(0)
   val unreadChatMessages: StateFlow<Int> = _unreadChatMessages.asStateFlow()
+
+  private val _floatingMessage = MutableStateFlow<String?>(null)
+  val floatingMessage: StateFlow<String?> = _floatingMessage.asStateFlow()
+
+  private val _floatingMessagesEnabled = MutableStateFlow(prefs.getBoolean("floating_messages_enabled", true))
+  val floatingMessagesEnabled: StateFlow<Boolean> = _floatingMessagesEnabled.asStateFlow()
+
+  fun setFloatingMessagesEnabled(value: Boolean) {
+    _floatingMessagesEnabled.value = value
+    prefs.putBoolean("floating_messages_enabled", value)
+  }
+
+  fun clearFloatingMessage() {
+    _floatingMessage.value = null
+  }
 
   fun incrementUnreadChat() { _unreadChatMessages.value++ }
   fun clearUnreadChat() { _unreadChatMessages.value = 0 }

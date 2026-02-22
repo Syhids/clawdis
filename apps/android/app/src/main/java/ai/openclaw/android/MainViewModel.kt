@@ -58,6 +58,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   // Unread message counter for the chat badge
   val unreadMessages: StateFlow<Int> = runtime.unreadChatMessages
 
+  // Floating message toast in Talk Mode
+  val floatingMessage: StateFlow<String?> = runtime.floatingMessage
+  val floatingMessagesEnabled: StateFlow<Boolean> = runtime.floatingMessagesEnabled
+
+  fun setFloatingMessagesEnabled(value: Boolean) {
+    runtime.setFloatingMessagesEnabled(value)
+  }
+
+  fun clearFloatingMessage() {
+    runtime.clearFloatingMessage()
+  }
+
   fun incrementUnread() { runtime.incrementUnreadChat() }
   fun clearUnread() { runtime.clearUnreadChat() }
 

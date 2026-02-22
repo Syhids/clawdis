@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -328,10 +329,36 @@ fun RootScreen(viewModel: MainViewModel) {
         isSpeaking = talkIsSpeaking,
       )
     }
+
+    // Floating message toast — show below orb when talk mode is active
+    val floatingMsg by viewModel.floatingMessage.collectAsState()
+    val floatingEnabled by viewModel.floatingMessagesEnabled.collectAsState()
+
+    if (floatingEnabled) {
+      Popup(alignment = Alignment.BottomCenter, properties = PopupProperties(focusable = false)) {
+        TalkFloatingMessage(
+          message = floatingMsg,
+          unreadCount = unreadMessages,
+          onTap = {
+            viewModel.clearFloatingMessage()
+            viewModel.clearUnread()
+            sheet = Sheet.Chat
+          },
+          modifier = Modifier
+            .windowInsetsPadding(safeBottomInsets)
+            .padding(bottom = 88.dp),
+        )
+      }
+    }
   }
 
   val currentSheet = sheet
   if (currentSheet != null) {
+    LaunchedEffect(currentSheet) {
+      if (currentSheet == Sheet.Chat) {
+        viewModel.clearFloatingMessage()
+      }
+    }
     ModalBottomSheet(
       onDismissRequest = { sheet = null },
       sheetState = sheetState,

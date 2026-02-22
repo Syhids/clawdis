@@ -23,7 +23,7 @@ class ChatController(
   private val session: GatewaySession,
   private val json: Json,
   private val supportsChatSubscribe: Boolean,
-  private val onNewAssistantMessage: (() -> Unit)? = null,
+  private val onNewAssistantMessage: ((String) -> Unit)? = null,
 ) {
   private val _sessionKey = MutableStateFlow("main")
   val sessionKey: StateFlow<String> = _sessionKey.asStateFlow()
@@ -330,9 +330,6 @@ class ChatController(
         if (state == "error") {
           _errorText.value = payload["errorMessage"].asStringOrNull() ?: "Chat failed"
         }
-        if (state == "final") {
-          onNewAssistantMessage?.invoke()
-        }
         if (runId != null) clearPendingRun(runId) else clearPendingRuns()
         pendingToolCallsById.clear()
         publishPendingToolCalls()
@@ -345,6 +342,13 @@ class ChatController(
             _messages.value = history.messages
             _sessionId.value = history.sessionId
             history.thinkingLevel?.trim()?.takeIf { it.isNotEmpty() }?.let { _thinkingLevel.value = it }
+            if (state == "final") {
+              val lastAssistantText = history.messages.lastOrNull { it.role == "assistant" }
+                ?.content?.firstOrNull { it.type == "text" }?.text
+              if (!lastAssistantText.isNullOrBlank()) {
+                onNewAssistantMessage?.invoke(lastAssistantText)
+              }
+            }
           } catch (_: Throwable) {
             // best-effort
           }
