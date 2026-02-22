@@ -341,6 +341,7 @@ class NodeRuntime(context: Context) {
   val wakeWords: StateFlow<List<String>> = prefs.wakeWords
   val voiceWakeMode: StateFlow<VoiceWakeMode> = prefs.voiceWakeMode
   val talkEnabled: StateFlow<Boolean> = prefs.talkEnabled
+  val seasonalEffect = prefs.seasonalEffect
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
@@ -537,6 +538,10 @@ class NodeRuntime(context: Context) {
 
   fun setTalkEnabled(value: Boolean) {
     prefs.setTalkEnabled(value)
+  }
+
+  fun setSeasonalEffect(effect: ai.openclaw.android.ui.seasonal.SeasonalEffect) {
+    prefs.setSeasonalEffect(effect)
   }
 
   fun refreshGatewayConnection() {

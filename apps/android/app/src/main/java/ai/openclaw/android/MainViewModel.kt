@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import ai.openclaw.android.gateway.GatewayEndpoint
 import ai.openclaw.android.chat.OutgoingAttachment
+import ai.openclaw.android.ui.seasonal.SeasonalEffect
 import ai.openclaw.android.node.CameraCaptureManager
 import ai.openclaw.android.node.CanvasController
 import ai.openclaw.android.node.ScreenRecordManager
@@ -54,6 +55,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val manualTls: StateFlow<Boolean> = runtime.manualTls
   val gatewayToken: StateFlow<String> = runtime.gatewayToken
   val canvasDebugStatusEnabled: StateFlow<Boolean> = runtime.canvasDebugStatusEnabled
+  val seasonalEffect: StateFlow<SeasonalEffect> = runtime.seasonalEffect
 
   // Unread message counter for the chat badge
   val unreadMessages: StateFlow<Int> = runtime.unreadChatMessages
@@ -134,6 +136,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setTalkEnabled(enabled: Boolean) {
     runtime.setTalkEnabled(enabled)
+  }
+
+  fun setSeasonalEffect(effect: SeasonalEffect) {
+    runtime.setSeasonalEffect(effect)
   }
 
   fun refreshGatewayConnection() {
