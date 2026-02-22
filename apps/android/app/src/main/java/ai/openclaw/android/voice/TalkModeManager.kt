@@ -114,6 +114,16 @@ class TalkModeManager(
   private var systemTtsPending: CompletableDeferred<Unit>? = null
   private var systemTtsPendingId: String? = null
 
+  private val mediaPathRegex = Regex("""^MEDIA:(.+)$""", RegexOption.MULTILINE)
+
+  private fun extractMediaPaths(text: String): List<String> {
+    return mediaPathRegex.findAll(text).map { it.groupValues[1].trim() }.toList()
+  }
+
+  private fun stripMediaPaths(text: String): String {
+    return text.replace(mediaPathRegex, "").trim()
+  }
+
   fun setMainSessionKey(sessionKey: String?) {
     val trimmed = sessionKey?.trim().orEmpty()
     if (trimmed.isEmpty()) return
@@ -441,12 +451,89 @@ class TalkModeManager(
         content.mapNotNull { entry ->
           entry.asObjectOrNull()?.get("text")?.asStringOrNull()?.trim()
         }.filter { it.isNotEmpty() }
-      if (text.isNotEmpty()) return text.joinToString("\n")
+      if (text.isNotEmpty()) return stripMediaPaths(text.joinToString("\n")).ifEmpty { null }
     }
     return null
   }
 
+  private suspend fun downloadAudioFromGateway(path: String): ByteArray? {
+    return try {
+      val res = session.request("file.read", """{"path":"$path"}""", timeoutMs = 30_000)
+      val root = json.parseToJsonElement(res).asObjectOrNull() ?: return null
+      val base64Str = root["base64"].asStringOrNull() ?: return null
+      android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
+    } catch (err: Throwable) {
+      Log.w(tag, "download audio failed: ${err.message}")
+      null
+    }
+  }
+
+  private suspend fun playDownloadedAudio(audioBytes: ByteArray) {
+    val tempFile = java.io.File.createTempFile("tts_", ".mp3", context.cacheDir)
+    tempFile.writeBytes(audioBytes)
+    try {
+      stopSpeaking(resetInterrupt = false)
+      val mp = MediaPlayer()
+      this.player = mp
+      mp.setAudioAttributes(
+        AudioAttributes.Builder()
+          .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+          .setUsage(AudioAttributes.USAGE_ASSISTANT)
+          .build(),
+      )
+      mp.setDataSource(tempFile.absolutePath)
+      val prepared = CompletableDeferred<Unit>()
+      val finished = CompletableDeferred<Unit>()
+      mp.setOnPreparedListener { it.start(); prepared.complete(Unit) }
+      mp.setOnCompletionListener { finished.complete(Unit) }
+      mp.setOnErrorListener { _, _, _ ->
+        finished.completeExceptionally(IllegalStateException("MediaPlayer error"))
+        true
+      }
+      withContext(Dispatchers.Main) { mp.prepareAsync() }
+      prepared.await()
+      finished.await()
+    } finally {
+      tempFile.delete()
+      cleanupPlayer()
+    }
+  }
+
   private suspend fun playAssistant(text: String) {
+    // Check for MEDIA: audio paths (gateway TTS) before anything else
+    val mediaPaths = extractMediaPaths(text)
+    val audioPath = mediaPaths.firstOrNull { it.contains("/tts-") || it.endsWith(".mp3") || it.endsWith(".ogg") || it.endsWith(".wav") }
+    if (audioPath != null) {
+      val strippedText = stripMediaPaths(text)
+      if (strippedText.isNotEmpty()) {
+        _lastAssistantText.value = strippedText
+      }
+      _statusText.value = "Downloading audio…"
+      _isSpeaking.value = true
+      ensureInterruptListener()
+      try {
+        val audioBytes = downloadAudioFromGateway(audioPath)
+        if (audioBytes != null) {
+          _statusText.value = "Speaking…"
+          playDownloadedAudio(audioBytes)
+          _isSpeaking.value = false
+          return
+        }
+        Log.w(tag, "MEDIA download failed, falling through to ElevenLabs/system TTS")
+      } catch (err: Throwable) {
+        Log.w(tag, "MEDIA playback failed: ${err.message}; falling through")
+      }
+      _isSpeaking.value = false
+      // Fall through to existing ElevenLabs/system TTS with stripped text
+      if (strippedText.isEmpty()) return
+      playAssistantWithTts(strippedText)
+      return
+    }
+
+    playAssistantWithTts(text)
+  }
+
+  private suspend fun playAssistantWithTts(text: String) {
     val parsed = TalkDirectiveParser.parse(text)
     if (parsed.unknownKeys.isNotEmpty()) {
       Log.w(tag, "Unknown talk directive keys: ${parsed.unknownKeys}")

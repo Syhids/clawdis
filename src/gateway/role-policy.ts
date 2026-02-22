@@ -1,4 +1,4 @@
-import { isNodeRoleMethod } from "./method-scopes.js";
+import { isNodeRoleMethod, resolveRequiredOperatorScopeForMethod } from "./method-scopes.js";
 
 export const GATEWAY_ROLES = ["operator", "node"] as const;
 
@@ -17,7 +17,11 @@ export function roleCanSkipDeviceIdentity(role: GatewayRole, sharedAuthOk: boole
 
 export function isRoleAuthorizedForMethod(role: GatewayRole, method: string): boolean {
   if (isNodeRoleMethod(method)) {
-    return role === "node";
+    if (role === "node") {
+      return true;
+    }
+    // Allow operators if the method also has an operator scope mapping (dual-access)
+    return resolveRequiredOperatorScopeForMethod(method) !== undefined;
   }
   return role === "operator";
 }
