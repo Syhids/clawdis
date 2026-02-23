@@ -23,6 +23,8 @@ class ChatController(
   private val session: GatewaySession,
   private val json: Json,
   private val supportsChatSubscribe: Boolean,
+  private val audioPlayback: AudioPlaybackManager? = null,
+  private val isTalkModeActive: (() -> Boolean)? = null,
   private val onNewAssistantMessage: (() -> Unit)? = null,
 ) {
   private val _sessionKey = MutableStateFlow("main")
@@ -368,6 +370,12 @@ class ChatController(
         if (!text.isNullOrEmpty()) {
           _streamingAssistantText.value = text
         }
+        // Play inline audio from gateway TTS (skip if TalkMode is active —
+        // TalkMode has its own audio pipeline via ElevenLabs/system TTS).
+        val audio = data?.get("audio")?.asArrayOrNull()
+        if (audio != null && audio.isNotEmpty() && isTalkModeActive?.invoke() != true) {
+          playFirstAudio(audio)
+        }
       }
       "tool" -> {
         val phase = data?.get("phase")?.asStringOrNull()
@@ -405,6 +413,23 @@ class ChatController(
   private fun publishPendingToolCalls() {
     _pendingToolCalls.value =
       pendingToolCallsById.values.sortedBy { it.startedAtMs }
+  }
+
+  /**
+   * Extract the first audio entry from the inline `audio` array and play it.
+   * Each entry is `{ "base64": "...", "mimeType": "audio/ogg", "sizeBytes": N }`.
+   */
+  private fun playFirstAudio(audioArray: JsonArray) {
+    val manager = audioPlayback ?: return
+    for (item in audioArray) {
+      val obj = item.asObjectOrNull() ?: continue
+      val base64 = obj["base64"].asStringOrNull() ?: continue
+      val mimeType = obj["mimeType"].asStringOrNull() ?: "audio/ogg"
+      if (base64.isNotEmpty()) {
+        manager.play(base64, mimeType)
+        return
+      }
+    }
   }
 
   private fun armPendingRunTimeout(runId: String) {

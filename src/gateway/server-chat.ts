@@ -5,6 +5,7 @@ import { loadConfig } from "../config/config.js";
 import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
+import { enrichAgentEventWithAudio } from "./agent-event-audio.js";
 import { loadSessionEntry } from "./session-utils.js";
 import { formatForLog } from "./ws-log.js";
 
@@ -451,7 +452,21 @@ export function createAgentEventHandler({
       // Send tool events to node/channel subscribers only when verbose is enabled;
       // WS clients already received the event above via broadcastToConnIds.
       if (!isToolEvent || toolVerbose !== "off") {
-        nodeSendToSession(sessionKey, "agent", isToolEvent ? toolPayload : agentPayload);
+        // For assistant events with MEDIA: audio paths, enrich with inline
+        // base64 audio so remote nodes (Android/iOS) can play it directly.
+        if (
+          !isToolEvent &&
+          evt.stream === "assistant" &&
+          Array.isArray(evt.data?.mediaUrls) &&
+          evt.data.mediaUrls.length > 0
+        ) {
+          void enrichAgentEventWithAudio(evt.data).then((enrichedData) => {
+            const enrichedPayload = { ...agentPayload, data: enrichedData };
+            nodeSendToSession(sessionKey, "agent", enrichedPayload);
+          });
+        } else {
+          nodeSendToSession(sessionKey, "agent", isToolEvent ? toolPayload : agentPayload);
+        }
       }
       if (!isAborted && evt.stream === "assistant" && typeof evt.data?.text === "string") {
         emitChatDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text);
