@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import ai.openclaw.android.chat.AudioPlaybackManager
 import ai.openclaw.android.chat.ChatController
 import ai.openclaw.android.chat.ChatMessage
 import ai.openclaw.android.chat.ChatPendingToolCall
@@ -274,12 +275,17 @@ class NodeRuntime(context: Context) {
       },
     )
 
+  private val audioPlayback: AudioPlaybackManager =
+    AudioPlaybackManager(scope = scope, cacheDir = appContext.cacheDir)
+
   private val chat: ChatController =
     ChatController(
       scope = scope,
       session = operatorSession,
       json = json,
       supportsChatSubscribe = false,
+      audioPlayback = audioPlayback,
+      isTalkModeActive = { talkMode.isEnabled.value },
       onNewAssistantMessage = { _unreadChatMessages.value++ },
     )
   private val talkMode: TalkModeManager by lazy {
