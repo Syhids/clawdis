@@ -14,6 +14,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.srcDir(file("../../shared/OpenClawKit/Sources/OpenClawKit/Resources"))
+      assets.srcDir("$buildDir/generated/changelog")
     }
   }
 
@@ -148,4 +149,20 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
+}
+
+val generateChangelog by tasks.registering(Exec::class) {
+  commandLine("git", "log", "--oneline", "-50", "--no-merges")
+  val outputFile = file("$buildDir/generated/changelog/changelog.txt")
+  doFirst { outputFile.parentFile.mkdirs() }
+  standardOutput = java.io.ByteArrayOutputStream()
+  isIgnoreExitValue = true
+  doLast {
+    outputFile.writeText((standardOutput as java.io.ByteArrayOutputStream).toString())
+  }
+  outputs.upToDateWhen { false }
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+  dependsOn(generateChangelog)
 }

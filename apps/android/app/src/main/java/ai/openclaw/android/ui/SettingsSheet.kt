@@ -709,6 +709,40 @@ fun SettingsSheet(viewModel: MainViewModel) {
       )
     }
 
+    item { HorizontalDivider() }
+
+    // Changelog
+    item { Text("Changelog", style = MaterialTheme.typography.titleSmall) }
+    item {
+      var changelogExpanded by remember { mutableStateOf(false) }
+      val changelogText = remember {
+        try {
+          context.assets.open("changelog.txt").bufferedReader().readText()
+        } catch (_: Exception) {
+          "Changelog not available"
+        }
+      }
+      Column {
+        ListItem(
+          headlineContent = { Text("Recent Changes") },
+          trailingContent = {
+            Icon(
+              imageVector = if (changelogExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+              contentDescription = if (changelogExpanded) "Collapse" else "Expand",
+            )
+          },
+          modifier = Modifier.clickable { changelogExpanded = !changelogExpanded },
+        )
+        AnimatedVisibility(visible = changelogExpanded) {
+          Text(
+            text = changelogText,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+      }
+    }
+
     item { Spacer(modifier = Modifier.height(20.dp)) }
   }
 }
