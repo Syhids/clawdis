@@ -182,7 +182,24 @@ class SecurePrefs(context: Context) {
     if (manual.isNotEmpty()) return manual
     val key = "gateway.token.${_instanceId.value}"
     val stored = securePrefs.getString(key, null)?.trim()
-    return stored?.takeIf { it.isNotEmpty() }
+    if (!stored.isNullOrEmpty()) return stored
+    // File-based fallback: allows ADB injection without navigating the UI.
+    //   adb shell 'echo TOKEN > /data/data/ai.openclaw.android/files/openclaw/gateway_token.txt'
+    return tryImportFileToken()
+  }
+
+  private fun tryImportFileToken(): String? {
+    try {
+      val file = java.io.File(appContext.filesDir, "openclaw/gateway_token.txt")
+      if (!file.exists()) return null
+      val token = file.readText().trim()
+      if (token.isEmpty()) return null
+      setGatewayToken(token)
+      file.delete()
+      return token
+    } catch (_: Throwable) {
+      return null
+    }
   }
 
   fun saveGatewayToken(token: String) {
