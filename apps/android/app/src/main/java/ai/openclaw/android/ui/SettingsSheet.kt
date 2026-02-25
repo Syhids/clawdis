@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -620,6 +621,51 @@ fun SettingsSheet(viewModel: MainViewModel) {
           )
         },
       )
+    }
+
+      item { HorizontalDivider(color = mobileBorder) }
+
+    // Changelog
+      item {
+        Text(
+          "CHANGELOG",
+          style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+          color = mobileAccent,
+        )
+      }
+    item {
+      var changelogExpanded by remember { mutableStateOf(false) }
+      val changelogText = remember {
+        try {
+          context.assets.open("changelog.txt").bufferedReader().readText()
+        } catch (_: Exception) {
+          "Changelog not available"
+        }
+      }
+      Column {
+        ListItem(
+          modifier = settingsRowModifier().clickable { changelogExpanded = !changelogExpanded },
+          colors = listItemColors,
+          headlineContent = { Text("Changelog", style = mobileHeadline) },
+          supportingContent = { Text("Tap to see recent changes", style = mobileCallout) },
+          trailingContent = {
+            Text(
+              if (changelogExpanded) "▲" else "▼",
+              color = mobileTextSecondary,
+            )
+          },
+        )
+        AnimatedVisibility(visible = changelogExpanded) {
+          Text(
+            changelogText,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = mobileText,
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 12.dp, vertical = 8.dp),
+          )
+        }
+      }
     }
 
       item { Spacer(modifier = Modifier.height(24.dp)) }
