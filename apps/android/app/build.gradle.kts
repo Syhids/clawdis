@@ -13,6 +13,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.add("../../shared/OpenClawKit/Sources/OpenClawKit/Resources")
+      assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
     }
   }
 
@@ -88,6 +89,24 @@ androidComponents {
       }
   }
 }
+val generateChangelog by tasks.registering {
+  val outputFile = layout.buildDirectory.file("generated/changelog/changelog.txt")
+  outputs.file(outputFile)
+  doLast {
+    val result = providers.exec {
+      commandLine("git", "log", "--format=%ad %s", "--date=format:%d/%m/%y", "-50", "--no-merges")
+    }.standardOutput.asText.get().trim()
+    outputFile.get().asFile.apply {
+      parentFile.mkdirs()
+      writeText(result)
+    }
+  }
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+  dependsOn(generateChangelog)
+}
+
 kotlin {
   compilerOptions {
     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
