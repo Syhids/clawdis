@@ -61,7 +61,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -592,12 +595,35 @@ fun SettingsSheet(viewModel: MainViewModel) {
           },
         )
         AnimatedVisibility(visible = changelogExpanded) {
-          Text(
-            text = changelogText,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = mobileTextSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-          )
+          Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            changelogText.lines().filter { it.isNotBlank() }.forEach { line ->
+              val colonIdx = line.indexOf(": ")
+              val annotated = buildAnnotatedString {
+                if (colonIdx in 1..39) {
+                  withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append(line.substring(0, colonIdx + 1))
+                  }
+                  append(line.substring(colonIdx + 1))
+                } else {
+                  // No conventional commit format — bold just the date (first 8 chars) if present
+                  if (line.length > 8 && line[2] == '/' && line[5] == '/') {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                      append(line.substring(0, 8))
+                    }
+                    append(line.substring(8))
+                  } else {
+                    append(line)
+                  }
+                }
+              }
+              Text(
+                text = annotated,
+                style = MaterialTheme.typography.bodySmall,
+                color = mobileTextSecondary,
+                modifier = Modifier.padding(vertical = 2.dp),
+              )
+            }
+          }
         }
       }
     }

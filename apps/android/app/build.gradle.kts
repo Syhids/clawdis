@@ -166,7 +166,7 @@ val generateChangelog by tasks.registering {
     dir.mkdirs()
     val logOutput = try {
       providers.exec {
-        commandLine("git", "log", "--oneline", "-50", "--no-merges")
+        commandLine("git", "log", "--format=%ad %s", "--date=format:%d/%m/%y", "-50", "--no-merges")
       }.standardOutput.asText.get()
     } catch (_: Exception) {
       "Changelog not available"
