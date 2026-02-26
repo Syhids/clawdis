@@ -9,8 +9,10 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,9 +35,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -552,6 +557,49 @@ fun SettingsSheet(viewModel: MainViewModel) {
           )
         },
       )
+    }
+
+      item { HorizontalDivider(color = mobileBorder) }
+
+    // Changelog
+      item {
+        Text(
+          "CHANGELOG",
+          style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+          color = mobileAccent,
+        )
+      }
+    item {
+      val changelogText = remember {
+        try {
+          context.assets.open("changelog.txt").bufferedReader().readText()
+        } catch (_: Exception) {
+          "Changelog not available"
+        }
+      }
+      var changelogExpanded by remember { mutableStateOf(false) }
+      Column(modifier = settingsRowModifier()) {
+        ListItem(
+          modifier = Modifier.clickable { changelogExpanded = !changelogExpanded },
+          colors = listItemColors,
+          headlineContent = { Text("Recent Changes", style = mobileHeadline) },
+          trailingContent = {
+            Icon(
+              imageVector = if (changelogExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+              contentDescription = if (changelogExpanded) "Collapse" else "Expand",
+              tint = mobileTextSecondary,
+            )
+          },
+        )
+        AnimatedVisibility(visible = changelogExpanded) {
+          Text(
+            text = changelogText,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = mobileTextSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+          )
+        }
+      }
     }
 
       item { Spacer(modifier = Modifier.height(24.dp)) }

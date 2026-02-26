@@ -13,6 +13,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.add("../../shared/OpenClawKit/Sources/OpenClawKit/Resources")
+      assets.directories.add(layout.buildDirectory.dir("generated/changelog").map { it.asFile.path })
     }
   }
 
@@ -153,4 +154,29 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
+}
+
+val generateChangelog by tasks.registering {
+  val outputDir = layout.buildDirectory.dir("generated/changelog")
+  outputs.dir(outputDir)
+  outputs.upToDateWhen { false }
+
+  doLast {
+    val dir = outputDir.get().asFile
+    dir.mkdirs()
+    val logOutput = try {
+      providers.exec {
+        commandLine("git", "log", "--oneline", "-50", "--no-merges")
+      }.standardOutput.asText.get()
+    } catch (_: Exception) {
+      "Changelog not available"
+    }
+    File(dir, "changelog.txt").writeText(logOutput.ifBlank { "Changelog not available" })
+  }
+}
+
+tasks.configureEach {
+  if (name.contains("merge", ignoreCase = true) && name.contains("Assets", ignoreCase = true)) {
+    dependsOn(generateChangelog)
+  }
 }
