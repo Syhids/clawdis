@@ -13,7 +13,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.add("../../shared/OpenClawKit/Sources/OpenClawKit/Resources")
-      assets.directories.add(layout.buildDirectory.dir("generated/changelog").map { it.asFile.path })
+      assets.srcDirs(layout.buildDirectory.dir("generated/changelog").get().asFile.path)
     }
   }
 
