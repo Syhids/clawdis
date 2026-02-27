@@ -96,7 +96,7 @@ abstract class GenerateChangelogTask : DefaultTask() {
   @TaskAction
   fun generate() {
     val result = project.providers.exec {
-      commandLine("git", "log", "--format=%ad %s", "--date=format:%d/%m/%y", "-50", "--no-merges", "--", "apps/android/")
+      commandLine("git", "log", "--format=%ad %s", "--date=format:%d/%m/%y", "-50", "--no-merges")
     }.standardOutput.asText.get().trim()
     val outFile = outputDir.get().asFile.resolve("changelog.txt")
     outFile.parentFile.mkdirs()
