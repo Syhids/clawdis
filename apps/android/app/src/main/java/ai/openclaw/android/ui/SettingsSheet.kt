@@ -9,8 +9,10 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,9 +35,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -55,8 +60,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -554,6 +562,59 @@ fun SettingsSheet(viewModel: MainViewModel) {
       )
     }
 
+      item { HorizontalDivider(color = mobileBorder) }
+
+      // Changelog
+      item {
+        Text(
+          "CHANGELOG",
+          style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+          color = mobileAccent,
+        )
+      }
+      item {
+        val changelogText = remember {
+          try {
+            context.assets.open("changelog.txt").bufferedReader().readText()
+          } catch (_: Exception) {
+            null
+          }
+        }
+        var expanded by remember { mutableStateOf(false) }
+        Column(modifier = settingsRowModifier()) {
+          ListItem(
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+            colors = listItemColors,
+            headlineContent = { Text("Changelog", style = mobileHeadline) },
+            supportingContent = {
+              if (!expanded) {
+                Text("Tap to see recent changes", style = mobileCallout)
+              }
+            },
+            trailingContent = {
+              Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = mobileTextSecondary,
+              )
+            },
+          )
+          AnimatedVisibility(visible = expanded) {
+            Column(
+              modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+              val lines = changelogText?.lines()?.filter { it.isNotBlank() } ?: emptyList()
+              if (lines.isEmpty()) {
+                Text("No changelog available.", style = MaterialTheme.typography.bodySmall, color = mobileTextSecondary)
+              } else {
+                lines.forEach { line -> ChangelogLine(line) }
+              }
+            }
+          }
+        }
+      }
+
       item { Spacer(modifier = Modifier.height(24.dp)) }
     }
   }
@@ -602,4 +663,29 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+@Composable
+private fun ChangelogLine(line: String) {
+  val colonIndex = line.indexOf(": ")
+  val annotated = buildAnnotatedString {
+    if (colonIndex in 1..39) {
+      withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+        append(line.substring(0, colonIndex + 1))
+      }
+      append(line.substring(colonIndex + 1))
+    } else if (line.length >= 8 && line[2] == '/' && line[5] == '/') {
+      withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+        append(line.substring(0, 8))
+      }
+      append(line.substring(8))
+    } else {
+      append(line)
+    }
+  }
+  Text(
+    text = annotated,
+    style = MaterialTheme.typography.bodySmall,
+    color = mobileText,
+  )
 }
