@@ -13,7 +13,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.add("../../shared/OpenClawKit/Sources/OpenClawKit/Resources")
-      assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
+      // changelog asset dir added via Variant API below
     }
   }
 
@@ -89,22 +89,32 @@ androidComponents {
       }
   }
 }
-val generateChangelog by tasks.registering {
-  val outputFile = layout.buildDirectory.file("generated/changelog/changelog.txt")
-  outputs.file(outputFile)
-  doLast {
-    val result = providers.exec {
+abstract class GenerateChangelogTask : DefaultTask() {
+  @get:OutputDirectory
+  abstract val outputDir: DirectoryProperty
+
+  @TaskAction
+  fun generate() {
+    val result = project.providers.exec {
       commandLine("git", "log", "--format=%ad %s", "--date=format:%d/%m/%y", "-50", "--no-merges")
     }.standardOutput.asText.get().trim()
-    outputFile.get().asFile.apply {
-      parentFile.mkdirs()
-      writeText(result)
-    }
+    val outFile = outputDir.get().asFile.resolve("changelog.txt")
+    outFile.parentFile.mkdirs()
+    outFile.writeText(result)
   }
 }
 
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
-  dependsOn(generateChangelog)
+val generateChangelog = tasks.register<GenerateChangelogTask>("generateChangelog") {
+  outputDir.set(layout.buildDirectory.dir("generated/changelog"))
+}
+
+androidComponents {
+  onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(
+      generateChangelog,
+      GenerateChangelogTask::outputDir
+    )
+  }
 }
 
 kotlin {
