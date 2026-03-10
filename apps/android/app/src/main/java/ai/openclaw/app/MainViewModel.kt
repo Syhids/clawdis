@@ -11,6 +11,7 @@ import ai.openclaw.app.chat.OutgoingAttachment
 import ai.openclaw.app.gateway.GatewayEndpoint
 import ai.openclaw.app.node.CameraCaptureManager
 import ai.openclaw.app.node.CanvasController
+import ai.openclaw.app.node.ScreenRecordManager
 import ai.openclaw.app.node.SmsManager
 import ai.openclaw.app.voice.VoiceConversationEntry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +54,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val canvasA2uiHydrated: StateFlow<Boolean> = runtimeState(initial = false) { it.canvasA2uiHydrated }
   val canvasRehydratePending: StateFlow<Boolean> = runtimeState(initial = false) { it.canvasRehydratePending }
   val canvasRehydrateErrorText: StateFlow<String?> = runtimeState(initial = null) { it.canvasRehydrateErrorText }
+  val screenRecordActive: StateFlow<Boolean> = runtimeState(initial = false) { it.screenRecordActive }
 
   val gateways: StateFlow<List<GatewayEndpoint>> = runtimeState(initial = emptyList()) { it.gateways }
   val discoveryStatusText: StateFlow<String> = runtimeState(initial = "Searching…") { it.discoveryStatusText }
@@ -117,14 +119,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val camera: CameraCaptureManager
     get() = ensureRuntime().camera
 
+  val screenRecorder: ScreenRecordManager
+    get() = ensureRuntime().screenRecorder
+
   val sms: SmsManager
     get() = ensureRuntime().sms
 
-  fun attachRuntimeUi(owner: LifecycleOwner, permissionRequester: PermissionRequester) {
+  fun attachRuntimeUi(owner: LifecycleOwner, permissionRequester: PermissionRequester, screenCaptureRequester: ScreenCaptureRequester) {
     val runtime = runtimeRef.value ?: return
     runtime.camera.attachLifecycleOwner(owner)
     runtime.camera.attachPermissionRequester(permissionRequester)
     runtime.sms.attachPermissionRequester(permissionRequester)
+    runtime.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
+    runtime.screenRecorder.attachPermissionRequester(permissionRequester)
   }
 
   fun setForeground(value: Boolean) {

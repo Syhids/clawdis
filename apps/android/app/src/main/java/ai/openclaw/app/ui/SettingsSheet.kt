@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -114,7 +115,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       viewModel.setCameraEnabled(cameraOk)
     }
 
-  var pendingLocationRequest by remember { mutableStateOf(false) }
+  var pendingLocationMode by remember { mutableStateOf<LocationMode?>(null) }
   var pendingPreciseToggle by remember { mutableStateOf(false) }
 
   val locationPermissionLauncher =
@@ -122,6 +123,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
       val fineOk = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true
       val coarseOk = perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
       val granted = fineOk || coarseOk
+      val requestedMode = pendingLocationMode
+      pendingLocationMode = null
 
       if (pendingPreciseToggle) {
         pendingPreciseToggle = false
@@ -129,9 +132,21 @@ fun SettingsSheet(viewModel: MainViewModel) {
         return@rememberLauncherForActivityResult
       }
 
-      if (pendingLocationRequest) {
-        pendingLocationRequest = false
-        viewModel.setLocationMode(if (granted) LocationMode.WhileUsing else LocationMode.Off)
+      if (!granted) {
+        viewModel.setLocationMode(LocationMode.Off)
+        return@rememberLauncherForActivityResult
+      }
+
+      if (requestedMode != null) {
+        viewModel.setLocationMode(requestedMode)
+        if (requestedMode == LocationMode.Always) {
+          val backgroundOk =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+              PackageManager.PERMISSION_GRANTED
+          if (!backgroundOk) {
+            openAppSettings(context)
+          }
+        }
       }
     }
 
@@ -243,6 +258,11 @@ fun SettingsSheet(viewModel: MainViewModel) {
       motionPermissionGranted = granted
     }
 
+  var appUpdateInstallEnabled by
+    remember {
+      mutableStateOf(canInstallUnknownApps(context))
+    }
+
   var smsPermissionGranted by
     remember {
       mutableStateOf(
@@ -285,6 +305,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
             !motionPermissionRequired ||
               ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
               PackageManager.PERMISSION_GRANTED
+          appUpdateInstallEnabled = canInstallUnknownApps(context)
           smsPermissionGranted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) ==
               PackageManager.PERMISSION_GRANTED
@@ -310,7 +331,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
     }
   }
 
-  fun requestLocationPermissions() {
+  fun requestLocationPermissions(targetMode: LocationMode) {
     val fineOk =
       ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED
@@ -318,9 +339,17 @@ fun SettingsSheet(viewModel: MainViewModel) {
       ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED
     if (fineOk || coarseOk) {
-      viewModel.setLocationMode(LocationMode.WhileUsing)
+      viewModel.setLocationMode(targetMode)
+      if (targetMode == LocationMode.Always) {
+        val backgroundOk =
+          ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!backgroundOk) {
+          openAppSettings(context)
+        }
+      }
     } else {
-      pendingLocationRequest = true
+      pendingLocationMode = targetMode
       locationPermissionLauncher.launch(
         arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
       )
@@ -390,7 +419,6 @@ fun SettingsSheet(viewModel: MainViewModel) {
               color = mobileTextTertiary,
             )
           }
-        }
       }
 
       // ── Media ──
@@ -674,6 +702,42 @@ fun SettingsSheet(viewModel: MainViewModel) {
         }
       }
 
+      // ── System ──
+      item {
+        Text(
+          "SYSTEM",
+          style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+          color = mobileAccent,
+        )
+      }
+      item {
+        Column(modifier = Modifier.settingsRowModifier()) {
+          ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            colors = listItemColors,
+            headlineContent = { Text("Install App Updates", style = mobileHeadline) },
+            supportingContent = {
+              Text(
+                "Enable install access for app.update package installs.",
+                style = mobileCallout,
+              )
+            },
+            trailingContent = {
+              Button(
+                onClick = { openUnknownAppSourcesSettings(context) },
+                colors = settingsPrimaryButtonColors(),
+                shape = RoundedCornerShape(14.dp),
+              ) {
+                Text(
+                  if (appUpdateInstallEnabled) "Manage" else "Enable",
+                  style = mobileCallout.copy(fontWeight = FontWeight.Bold),
+                )
+              }
+            },
+          )
+        }
+      }
+
       // ── Location ──
       item {
         Text(
@@ -705,7 +769,20 @@ fun SettingsSheet(viewModel: MainViewModel) {
             trailingContent = {
               RadioButton(
                 selected = locationMode == LocationMode.WhileUsing,
-                onClick = { requestLocationPermissions() },
+                onClick = { requestLocationPermissions(LocationMode.WhileUsing) },
+              )
+            },
+          )
+          HorizontalDivider(color = mobileBorder)
+          ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            colors = listItemColors,
+            headlineContent = { Text("Always", style = mobileHeadline) },
+            supportingContent = { Text("Allow background location (requires system permission).", style = mobileCallout) },
+            trailingContent = {
+              RadioButton(
+                selected = locationMode == LocationMode.Always,
+                onClick = { requestLocationPermissions(LocationMode.Always) },
               )
             },
           )
@@ -724,6 +801,13 @@ fun SettingsSheet(viewModel: MainViewModel) {
             },
           )
         }
+      }
+      item {
+        Text(
+          "Always may require Android Settings to allow background location.",
+          style = mobileCallout,
+          color = mobileTextSecondary,
+        )
       }
 
       // ── Preferences ──
@@ -819,6 +903,19 @@ private fun openNotificationListenerSettings(context: Context) {
   }
 }
 
+private fun openUnknownAppSourcesSettings(context: Context) {
+  val intent =
+    Intent(
+      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+      "package:${context.packageName}".toUri(),
+    )
+  runCatching {
+    context.startActivity(intent)
+  }.getOrElse {
+    openAppSettings(context)
+  }
+}
+
 private fun hasNotificationsPermission(context: Context): Boolean {
   if (Build.VERSION.SDK_INT < 33) return true
   return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -827,6 +924,10 @@ private fun hasNotificationsPermission(context: Context): Boolean {
 
 private fun isNotificationListenerEnabled(context: Context): Boolean {
   return DeviceNotificationListenerService.isAccessEnabled(context)
+}
+
+private fun canInstallUnknownApps(context: Context): Boolean {
+  return context.packageManager.canRequestPackageInstalls()
 }
 
 private fun hasMotionCapabilities(context: Context): Boolean {

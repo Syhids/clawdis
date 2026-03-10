@@ -88,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -126,6 +127,7 @@ private enum class PermissionToggle {
 
 private enum class SpecialAccessToggle {
   NotificationListener,
+  AppUpdates,
 }
 
 private val onboardingBackgroundGradient: Brush
@@ -273,6 +275,10 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     rememberSaveable {
       mutableStateOf(isNotificationListenerEnabled(context))
     }
+  var enableAppUpdates by
+    rememberSaveable {
+      mutableStateOf(canInstallUnknownApps(context))
+    }
   var enableMicrophone by rememberSaveable { mutableStateOf(false) }
   var enableCamera by rememberSaveable { mutableStateOf(false) }
   var enablePhotos by rememberSaveable { mutableStateOf(false) }
@@ -343,6 +349,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
   fun setSpecialAccessToggleEnabled(toggle: SpecialAccessToggle, enabled: Boolean) {
     when (toggle) {
       SpecialAccessToggle.NotificationListener -> enableNotificationListener = enabled
+      SpecialAccessToggle.AppUpdates -> enableAppUpdates = enabled
     }
   }
 
@@ -352,6 +359,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       enableLocation,
       enableNotifications,
       enableNotificationListener,
+      enableAppUpdates,
       enableMicrophone,
       enableCamera,
       enablePhotos,
@@ -368,6 +376,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       if (enableLocation) enabled += "Location"
       if (enableNotifications) enabled += "Notifications"
       if (enableNotificationListener) enabled += "Notification listener"
+      if (enableAppUpdates) enabled += "App updates"
       if (enableMicrophone) enabled += "Microphone"
       if (enableCamera) enabled += "Camera"
       if (enablePhotos) enabled += "Photos"
@@ -383,6 +392,10 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     var openedSpecialSetup = false
     if (enableNotificationListener && !isNotificationListenerEnabled(context)) {
       openNotificationListenerSettings(context)
+      openedSpecialSetup = true
+    }
+    if (enableAppUpdates && !canInstallUnknownApps(context)) {
+      openUnknownAppSourcesSettings(context)
       openedSpecialSetup = true
     }
     if (openedSpecialSetup) {
@@ -427,6 +440,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       val grantedNow =
         when (toggle) {
           SpecialAccessToggle.NotificationListener -> isNotificationListenerEnabled(context)
+          SpecialAccessToggle.AppUpdates -> canInstallUnknownApps(context)
         }
       if (grantedNow) {
         setSpecialAccessToggleEnabled(toggle, true)
@@ -436,6 +450,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       pendingSpecialAccessToggle = toggle
       when (toggle) {
         SpecialAccessToggle.NotificationListener -> openNotificationListenerSettings(context)
+        SpecialAccessToggle.AppUpdates -> openUnknownAppSourcesSettings(context)
       }
     }
 
@@ -450,6 +465,13 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             setSpecialAccessToggleEnabled(
               SpecialAccessToggle.NotificationListener,
               isNotificationListenerEnabled(context),
+            )
+            pendingSpecialAccessToggle = null
+          }
+          SpecialAccessToggle.AppUpdates -> {
+            setSpecialAccessToggleEnabled(
+              SpecialAccessToggle.AppUpdates,
+              canInstallUnknownApps(context),
             )
             pendingSpecialAccessToggle = null
           }
@@ -594,6 +616,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               enableLocation = enableLocation,
               enableNotifications = enableNotifications,
               enableNotificationListener = enableNotificationListener,
+              enableAppUpdates = enableAppUpdates,
               enableMicrophone = enableMicrophone,
               enableCamera = enableCamera,
               enablePhotos = enablePhotos,
@@ -636,6 +659,9 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               },
               onNotificationListenerChange = { checked ->
                 requestSpecialAccessToggle(SpecialAccessToggle.NotificationListener, checked)
+              },
+              onAppUpdatesChange = { checked ->
+                requestSpecialAccessToggle(SpecialAccessToggle.AppUpdates, checked)
               },
               onMicrophoneChange = { checked ->
                 requestPermissionToggle(
@@ -1289,6 +1315,7 @@ private fun PermissionsStep(
   enableLocation: Boolean,
   enableNotifications: Boolean,
   enableNotificationListener: Boolean,
+  enableAppUpdates: Boolean,
   enableMicrophone: Boolean,
   enableCamera: Boolean,
   enablePhotos: Boolean,
@@ -1305,6 +1332,7 @@ private fun PermissionsStep(
   onLocationChange: (Boolean) -> Unit,
   onNotificationsChange: (Boolean) -> Unit,
   onNotificationListenerChange: (Boolean) -> Unit,
+  onAppUpdatesChange: (Boolean) -> Unit,
   onMicrophoneChange: (Boolean) -> Unit,
   onCameraChange: (Boolean) -> Unit,
   onPhotosChange: (Boolean) -> Unit,
@@ -1339,6 +1367,7 @@ private fun PermissionsStep(
       isPermissionGranted(context, Manifest.permission.ACTIVITY_RECOGNITION)
     }
   val notificationListenerGranted = isNotificationListenerEnabled(context)
+  val appUpdatesGranted = canInstallUnknownApps(context)
 
   StepShell(title = "Permissions") {
     Text(
@@ -1383,6 +1412,14 @@ private fun PermissionsStep(
     )
 
     PermissionSectionHeader("Media")
+    PermissionToggleRow(
+      title = "App updates",
+      subtitle = "app.update install confirmation (opens Android Settings)",
+      checked = enableAppUpdates,
+      granted = appUpdatesGranted,
+      onCheckedChange = onAppUpdatesChange,
+    )
+    InlineDivider()
     PermissionToggleRow(
       title = "Microphone",
       subtitle = "Voice transcription in the Voice tab",
@@ -1763,8 +1800,25 @@ private fun isNotificationListenerEnabled(context: Context): Boolean {
   return DeviceNotificationListenerService.isAccessEnabled(context)
 }
 
+private fun canInstallUnknownApps(context: Context): Boolean {
+  return context.packageManager.canRequestPackageInstalls()
+}
+
 private fun openNotificationListenerSettings(context: Context) {
   val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+  runCatching {
+    context.startActivity(intent)
+  }.getOrElse {
+    openAppSettings(context)
+  }
+}
+
+private fun openUnknownAppSourcesSettings(context: Context) {
+  val intent =
+    Intent(
+      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+      "package:${context.packageName}".toUri(),
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
   runCatching {
     context.startActivity(intent)
   }.getOrElse {

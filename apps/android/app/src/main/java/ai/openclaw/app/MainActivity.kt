@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels()
   private lateinit var permissionRequester: PermissionRequester
+  private lateinit var screenCaptureRequester: ScreenCaptureRequester
   private var didAttachRuntimeUi = false
   private var didStartNodeService = false
 
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     WindowCompat.setDecorFitsSystemWindows(window, false)
     permissionRequester = PermissionRequester(this)
+    screenCaptureRequester = ScreenCaptureRequester(this)
 
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -42,7 +44,7 @@ class MainActivity : ComponentActivity() {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         viewModel.runtimeInitialized.collect { ready ->
           if (!ready || didAttachRuntimeUi) return@collect
-          viewModel.attachRuntimeUi(owner = this@MainActivity, permissionRequester = permissionRequester)
+          viewModel.attachRuntimeUi(owner = this@MainActivity, permissionRequester = permissionRequester, screenCaptureRequester = screenCaptureRequester)
           didAttachRuntimeUi = true
           if (!didStartNodeService) {
             NodeForegroundService.start(this@MainActivity)
