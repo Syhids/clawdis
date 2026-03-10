@@ -11,6 +11,7 @@ import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
+import ai.openclaw.app.protocol.OpenClawScreenCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
 
@@ -58,9 +59,11 @@ object InvokeCommandRegistry {
   val capabilityManifest: List<NodeCapabilitySpec> =
     listOf(
       NodeCapabilitySpec(name = OpenClawCapability.Canvas.rawValue),
+      NodeCapabilitySpec(name = OpenClawCapability.Screen.rawValue),
       NodeCapabilitySpec(name = OpenClawCapability.Device.rawValue),
       NodeCapabilitySpec(name = OpenClawCapability.Notifications.rawValue),
       NodeCapabilitySpec(name = OpenClawCapability.System.rawValue),
+      NodeCapabilitySpec(name = OpenClawCapability.AppUpdate.rawValue),
       NodeCapabilitySpec(
         name = OpenClawCapability.Camera.rawValue,
         availability = NodeCapabilityAvailability.CameraEnabled,
@@ -118,6 +121,10 @@ object InvokeCommandRegistry {
       ),
       InvokeCommandSpec(
         name = OpenClawCanvasA2UICommand.Reset.rawValue,
+        requiresForeground = true,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawScreenCommand.Record.rawValue,
         requiresForeground = true,
       ),
       InvokeCommandSpec(
@@ -195,6 +202,7 @@ object InvokeCommandRegistry {
         name = "debug.ed25519",
         availability = InvokeCommandAvailability.DebugBuild,
       ),
+      InvokeCommandSpec(name = "app.update"),
     )
 
   private val byNameInternal: Map<String, InvokeCommandSpec> = all.associateBy { it.name }

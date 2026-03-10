@@ -228,7 +228,7 @@ Notes:
 
 ## Screen recordings (nodes)
 
-Supported nodes expose `screen.record` (mp4). Example:
+Nodes expose `screen.record` (mp4). Example:
 
 ```bash
 openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
@@ -237,9 +237,10 @@ openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10 --no-
 
 Notes:
 
-- `screen.record` availability depends on node platform.
+- `screen.record` requires the node app to be foregrounded.
+- Android will show the system screen-capture prompt before recording.
 - Screen recordings are clamped to `<= 60s`.
-- `--no-audio` disables microphone capture on supported platforms.
+- `--no-audio` disables microphone capture (supported on iOS/Android; macOS uses system capture audio).
 - Use `--screen <index>` to select a display when multiple screens are available.
 
 ## Location (nodes)
@@ -286,6 +287,7 @@ Available families:
 - `contacts.search`, `contacts.add`
 - `calendar.events`, `calendar.add`
 - `motion.activity`, `motion.pedometer`
+- `app.update`
 
 Example invokes:
 
@@ -298,6 +300,7 @@ openclaw nodes invoke --node <idOrNameOrIp> --command photos.latest --params '{"
 Notes:
 
 - Motion commands are capability-gated by available sensors.
+- `app.update` is permission + policy gated by the node runtime.
 
 ## System commands (node host / mac node)
 
