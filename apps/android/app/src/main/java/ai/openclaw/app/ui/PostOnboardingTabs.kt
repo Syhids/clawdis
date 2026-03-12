@@ -103,29 +103,31 @@ fun PostOnboardingTabs(viewModel: MainViewModel, modifier: Modifier = Modifier) 
         statusVisual = statusVisual,
       )
     },
-    bottomBar = {
+  ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize()) {
+      Box(
+        modifier =
+          Modifier
+            .fillMaxSize()
+            .background(mobileBackgroundGradient)
+            .padding(innerPadding)
+            .consumeWindowInsets(innerPadding),
+      ) {
+        when (activeTab) {
+          HomeTab.Connect -> ConnectTabScreen(viewModel = viewModel)
+          HomeTab.Chat -> ChatSheet(viewModel = viewModel)
+          HomeTab.Voice -> VoiceTabScreen(viewModel = viewModel)
+          HomeTab.Screen -> ScreenTabScreen(viewModel = viewModel)
+          HomeTab.Settings -> SettingsSheet(viewModel = viewModel)
+        }
+      }
+
       if (!hideBottomTabBar) {
         BottomTabBar(
           activeTab = activeTab,
           onSelect = { activeTab = it },
+          modifier = Modifier.align(Alignment.BottomCenter),
         )
-      }
-    },
-  ) { innerPadding ->
-    Box(
-      modifier =
-        Modifier
-          .fillMaxSize()
-          .padding(innerPadding)
-          .consumeWindowInsets(innerPadding)
-          .background(mobileBackgroundGradient),
-    ) {
-      when (activeTab) {
-        HomeTab.Connect -> ConnectTabScreen(viewModel = viewModel)
-        HomeTab.Chat -> ChatSheet(viewModel = viewModel)
-        HomeTab.Voice -> VoiceTabScreen(viewModel = viewModel)
-        HomeTab.Screen -> ScreenTabScreen(viewModel = viewModel)
-        HomeTab.Settings -> SettingsSheet(viewModel = viewModel)
       }
     }
   }
@@ -268,13 +270,12 @@ private fun TopStatusBar(
 private fun BottomTabBar(
   activeTab: HomeTab,
   onSelect: (HomeTab) -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   val safeInsets = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
 
   Box(
-    modifier =
-      Modifier
-        .fillMaxWidth(),
+    modifier = modifier.fillMaxWidth(),
   ) {
     Surface(
       modifier = Modifier.fillMaxWidth(),
